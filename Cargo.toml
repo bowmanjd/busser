@@ -1,0 +1,13 @@
+[package]
+name = "busser"
+version = "0.1.0"
+edition = "2021"
+authors = ["Jonathan Bowman"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.70"
+argh = "0.1.10"
+csv = "1.1"
+serde_json = "1.0.94"
