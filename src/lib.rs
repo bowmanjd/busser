@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use csv::{Reader, ReaderBuilder, StringRecord};
 use serde_json::Map;
 use std::fs::File;
@@ -6,7 +6,9 @@ use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 
 fn csv_reader(csvfile: &PathBuf) -> Result<Reader<File>> {
-    let mut rdr = ReaderBuilder::new().from_path(csvfile)?;
+    let mut rdr = ReaderBuilder::new()
+        .from_path(csvfile)
+        .with_context(|| format!("Failed to read csv from {:?}", csvfile))?;
     let headers = rdr.headers()?;
     let new_headers: StringRecord = headers
         .iter()
