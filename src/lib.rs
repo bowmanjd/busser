@@ -2,18 +2,17 @@ use anyhow::Result;
 use csv::{Reader, ReaderBuilder, StringRecord};
 use serde_json::Map;
 use std::fs::File;
-use std::io::prelude::*;
-use std::io::{BufWriter, SeekFrom};
+use std::io::{BufWriter, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 
-pub fn csv_reader(csvfile: &PathBuf) -> Result<Reader<File>> {
+fn csv_reader(csvfile: &PathBuf) -> Result<Reader<File>> {
     let mut rdr = ReaderBuilder::new().from_path(csvfile)?;
     let headers = rdr.headers()?;
     let new_headers: StringRecord = headers
         .iter()
         .map(|h| {
             h.chars()
-                .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+                .map(|c| if c.is_alphanumeric() { c } else { '_' })
                 .collect::<String>()
         })
         .collect();
@@ -27,7 +26,7 @@ pub fn read_csv_headers(csvfile: &PathBuf) -> Result<Vec<String>> {
     Ok(headers.iter().map(str::to_string).collect())
 }
 
-pub fn csv_to_json(csvfile: &PathBuf, jsonfile: &PathBuf) -> Result<String> {
+pub fn csv_to_json(csvfile: &PathBuf, jsonfile: &PathBuf) -> Result<()> {
     let mut rdr = csv_reader(csvfile)?;
     let outfile = File::create(jsonfile)?;
     let mut stream = BufWriter::new(outfile);
@@ -50,7 +49,7 @@ pub fn csv_to_json(csvfile: &PathBuf, jsonfile: &PathBuf) -> Result<String> {
     stream.seek(SeekFrom::Current(-2))?;
     write!(stream, "\n]")?;
     stream.flush()?;
-    Ok("".to_string())
+    Ok(())
 }
 
 pub fn add(left: usize, right: usize) -> usize {
