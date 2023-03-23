@@ -13,6 +13,11 @@ pub fn check_integer(value: &str) -> Option<SQLType> {
             name: "tinyint".to_string(),
             ..Default::default()
         })
+    } else if value.parse::<i16>().is_ok() {
+        Some(SQLType {
+            name: "smallint".to_string(),
+            ..Default::default()
+        })
     } else if value.parse::<i32>().is_ok() {
         Some(SQLType {
             name: "int".to_string(),
