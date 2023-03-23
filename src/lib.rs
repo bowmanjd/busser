@@ -5,6 +5,8 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
+pub mod infer;
+
 fn csv_reader(csvfile: &PathBuf) -> Result<Reader<File>> {
     let mut rdr = ReaderBuilder::new()
         .from_path(csvfile)
@@ -35,11 +37,11 @@ pub fn csv_to_json(csvfile: &PathBuf, jsonfile: &PathBuf) -> Result<()> {
     let headers = rdr.headers()?.clone();
     let mut first_line = true;
 
-    write!(stream, "[\n")?;
+    writeln!(stream, "[")?;
 
     for result in rdr.records() {
-        if first_line == false {
-            write!(stream, ",\n")?;
+        if !first_line {
+            writeln!(stream, ",")?;
         } else {
             first_line = false;
         }
@@ -65,7 +67,7 @@ pub fn csv_to_bcp(csvfile: &PathBuf, bcpfile: &PathBuf) -> Result<()> {
     let mut stream = BufWriter::new(outfile);
     let mut first_line = true;
     for result in rdr.records() {
-        if first_line == false {
+        if !first_line {
             write!(stream, "\x1E")?;
         } else {
             first_line = false;

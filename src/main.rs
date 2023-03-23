@@ -12,10 +12,14 @@ struct Args {
     /// output JSON
     #[argh(option, short = 'j')]
     jsonfile: Option<PathBuf>,
-    ///
+
     /// output BCP
     #[argh(option, short = 'b')]
     bcpfile: Option<PathBuf>,
+
+    /// infer SQL type
+    #[argh(option, short = 'i')]
+    sqltype: Option<String>,
 }
 
 fn run() -> Result<()> {
@@ -27,6 +31,11 @@ fn run() -> Result<()> {
     }
     if let Some(bcpfile) = args.bcpfile {
         busser::csv_to_bcp(&args.csvfile, &bcpfile)?;
+    }
+    if let Some(sqltype) = args.sqltype {
+        if let Some(stype) = busser::infer::check_integer(&sqltype) {
+            println!("{}\nsize: {}\nprecision: {}", stype.name, stype.size, stype.precision);
+        }
     }
     Ok(())
 }
