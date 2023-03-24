@@ -33,8 +33,8 @@ fn run() -> Result<()> {
         busser::csv_to_bcp(&args.csvfile, &bcpfile)?;
     }
     if let Some(sqltype) = args.sqltype {
-        if let Some(stype) = busser::infer::check_integer(&sqltype) {
-            println!("{}\nsize: {}\nprecision: {}", stype.name, stype.size, stype.precision);
+        if let Some(stype) = busser::infer::check_char(&sqltype) {
+            println!("{}({}, {})\nfixed: {}", stype.name, stype.size, stype.scale, stype.fixed);
         }
     }
     Ok(())
