@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Clone, Debug, Default)]
 pub struct SQLType {
     pub name: String,
@@ -5,6 +7,20 @@ pub struct SQLType {
     pub index: usize,
     pub scale: usize,
     pub fixed: bool,
+}
+
+impl fmt::Display for SQLType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut name = self.name.clone();
+        if self.size > 0 {
+            name.push_str(&format!("({}", self.size));
+            if self.scale > 0 {
+                name.push_str(&format!(", {}", self.scale));
+            }
+            name.push(')');
+        }
+        write!(f, "{}", name)
+    }
 }
 
 /*

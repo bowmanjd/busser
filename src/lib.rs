@@ -30,7 +30,7 @@ pub fn read_csv_headers(csvfile: &PathBuf) -> Result<Vec<String>> {
     Ok(headers.iter().map(str::to_string).collect())
 }
 
-pub fn csv_to_json(csvfile: &PathBuf, jsonfile: &PathBuf) -> Result<()> {
+pub fn csv_to_json(csvfile: &PathBuf, jsonfile: &PathBuf, infer: bool) -> Result<()> {
     let mut rdr = csv_reader(csvfile)?;
     let outfile = File::create(jsonfile)?;
     let mut stream = BufWriter::new(outfile);
@@ -39,7 +39,12 @@ pub fn csv_to_json(csvfile: &PathBuf, jsonfile: &PathBuf) -> Result<()> {
     let row_length: usize = headers.len();
     writeln!(stream, "[")?;
     //let mut sqltypes: Vec<infer::SQLType> = Vec::with_capacity(row_length);
-    let mut sqltypes: Vec<infer::SQLType> = vec![infer::SQLType { ..Default::default() }; row_length];
+    let mut sqltypes: Vec<infer::SQLType> = vec![
+        infer::SQLType {
+            ..Default::default()
+        };
+        row_length
+    ];
 
     for result in rdr.records() {
         if !first_line {
@@ -52,20 +57,22 @@ pub fn csv_to_json(csvfile: &PathBuf, jsonfile: &PathBuf) -> Result<()> {
         for i in 0..row_length {
             let column = &headers[i];
             let value = &row[i];
-            if let Some(sqltype) = infer::infer(value, sqltypes[i].index) {
-                if sqltype.fixed && sqltypes[i].fixed && sqltype.size != sqltypes[i].size {
-                    if let Some(unfixed) = infer::infer(value, sqltypes[i].index + 1) {
-                        sqltypes[i] = unfixed;
+            if infer {
+                if let Some(sqltype) = infer::infer(value, sqltypes[i].index) {
+                    if sqltype.fixed && sqltypes[i].fixed && sqltype.size != sqltypes[i].size {
+                        if let Some(unfixed) = infer::infer(value, sqltypes[i].index + 1) {
+                            sqltypes[i] = unfixed;
+                        }
                     }
-                }
-                if sqltype.index > sqltypes[i].index {
-                    sqltypes[i] = sqltype;
-                } else if sqltype.index == sqltypes[i].index {
-                    if sqltype.size > sqltypes[i].size {
-                        sqltypes[i].size = sqltype.size;
-                    }
-                    if sqltype.scale > sqltypes[i].scale {
-                        sqltypes[i].scale = sqltype.scale 
+                    if sqltype.index > sqltypes[i].index {
+                        sqltypes[i] = sqltype;
+                    } else if sqltype.index == sqltypes[i].index {
+                        if sqltype.size > sqltypes[i].size {
+                            sqltypes[i].size = sqltype.size;
+                        }
+                        if sqltype.scale > sqltypes[i].scale {
+                            sqltypes[i].scale = sqltype.scale
+                        }
                     }
                 }
             }
@@ -76,7 +83,17 @@ pub fn csv_to_json(csvfile: &PathBuf, jsonfile: &PathBuf) -> Result<()> {
         write!(stream, "{}", json_text)?;
     }
     write!(stream, "\n]")?;
-    println!("{:?}", sqltypes);
+    let mut schema = String::new();
+    for i in 0..row_length {
+        let column = &headers[i];
+        let sqlt = &sqltypes[i];
+        schema.push_str(&format!("{} {}", column, sqlt));
+        if i < row_length - 1 {
+            schema.push_str(", ");
+        }
+    }
+
+    print!("{}", schema);
     stream.flush()?;
     Ok(())
 }
@@ -95,7 +112,6 @@ pub fn csv_to_bcp(csvfile: &PathBuf, bcpfile: &PathBuf) -> Result<()> {
         let row = result?;
         let fields = row.iter().collect::<Vec<&str>>();
         let line = fields.join("\x1F");
-        println!("{:?}", fields);
         write!(stream, "{}", line)?;
     }
     stream.flush()?;
