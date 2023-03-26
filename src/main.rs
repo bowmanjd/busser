@@ -33,6 +33,10 @@ struct OutputCmd {
     #[argh(option, short = 'b')]
     bcpfile: Option<PathBuf>,
 
+    /// SQL table name
+    #[argh(option, short = 't')]
+    table: String,
+
     /// infer SQL type
     #[argh(switch, short = 'i')]
     infer: bool,
@@ -68,7 +72,7 @@ fn header(args: HeaderCmd) -> Result<()> {
 
 fn output(args: OutputCmd) -> Result<()> {
     if let Some(jsonfile) = args.jsonfile {
-        busser::csv_to_json(&args.csvfile, &jsonfile, args.infer)?;
+        busser::csv_into(&args.csvfile, &jsonfile, &args.table, args.infer, true, None)?;
     }
     if let Some(bcpfile) = args.bcpfile {
         busser::csv_to_bcp(&args.csvfile, &bcpfile)?;

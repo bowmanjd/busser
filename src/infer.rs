@@ -9,6 +9,28 @@ pub struct SQLType {
     pub fixed: bool,
 }
 
+impl SQLType {
+    pub fn merge(&mut self, other: &Self) {
+        if other.fixed && self.fixed && other.size != self.size {
+            self.name = "varchar".to_string();
+            self.size = other.size.max(self.size);
+            self.index += 1;
+            self.fixed = false;
+        } else {
+            if self.index == other.index {
+                self.size = other.size.max(self.size);
+                self.scale = other.scale.max(self.scale);
+            } else {
+                self.name = other.name.clone();
+                self.index = other.index;
+                self.fixed = other.fixed;
+                self.size = other.size;
+                self.scale = other.scale;
+            }
+        }
+    }
+}
+
 impl fmt::Display for SQLType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut name = self.name.clone();
@@ -22,34 +44,6 @@ impl fmt::Display for SQLType {
         write!(f, "{}", name)
     }
 }
-
-/*
-pub fn infer_many(values: Vec<&str>, index: usize) -> Option<SQLType> {
-    let checks: Vec<&dyn Fn(&str) -> Option<SQLType>> = vec![
-        &check_bit,
-        &check_tinyint,
-        &check_smallint,
-        &check_int,
-        &check_bigint,
-        &check_decimal,
-        &check_real,
-        &check_float,
-        &check_char,
-        &check_varchar,
-        &check_varcharmax,
-    ];
-    let mut index = index.clone();
-    while index < checks.len() {
-        if let Some(mut typesize) = checks[index](value) {
-            typesize.index = index;
-            return Some(typesize);
-        } else {
-            index += 1;
-        }
-    }
-    None
-}
-*/
 
 pub fn infer(value: &str, index: usize) -> Option<SQLType> {
     if value == "" {
