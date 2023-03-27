@@ -13,7 +13,7 @@ struct Args {
 #[argh(subcommand)]
 enum Subcommands {
     Output(OutputCmd),
-    Header(HeaderCmd),
+    Columns(ColumnsCmd),
     Schema(SchemaCmd),
 }
 
@@ -42,16 +42,20 @@ struct OutputCmd {
     infer: bool,
 }
 
-/// Show CSV header
+/// Show CSV columns
 #[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "header")]
-struct HeaderCmd {
+#[argh(subcommand, name = "columns")]
+struct ColumnsCmd {
     /// CSV file path
     #[argh(positional)]
     csvfile: PathBuf,
 
+    /// SQL table name
+    #[argh(option, short = 't')]
+    table: Option<String>,
+
     #[argh(switch, short = 'r')]
-    /// get raw headers verbatim from CSV file
+    /// get raw columns verbatim from CSV file
     raw: bool,
 }
 
@@ -59,14 +63,27 @@ struct HeaderCmd {
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "schema")]
 struct SchemaCmd {
+    /// CSV file path
+    #[argh(positional)]
+    csvfile: PathBuf,
+
+    /// SQL table name
+    #[argh(option, short = 't')]
+    table: String,
+
     #[argh(switch, short = 'c')]
     /// use only varchars as type
     chars: bool,
 }
 
-fn header(args: HeaderCmd) -> Result<()> {
-    let headers = busser::read_csv_headers(&args.csvfile)?;
-    println!("{}", headers.join(", "));
+fn columns(args: ColumnsCmd) -> Result<()> {
+    let columns = busser::csv_columns(&args.csvfile, args.table, args.raw)?;
+    println!("{}", columns.join(", "));
+    Ok(())
+}
+
+fn schema(args: SchemaCmd) -> Result<()> {
+    busser::csv_schema(&args.csvfile, &args.table)?;
     Ok(())
 }
 
@@ -83,31 +100,11 @@ fn output(args: OutputCmd) -> Result<()> {
 fn run() -> Result<()> {
     let args: Args = argh::from_env();
     match args.subcommands {
-        Subcommands::Header(args) => header(args)?,
+        Subcommands::Columns(args) => columns(args)?,
         Subcommands::Output(args) => output(args)?,
-        Subcommands::Schema(args) => {
-            println!("args: {:?}", args);
-        },
+        Subcommands::Schema(args) => schema(args)?,
     }
 
-    /*
-    let headers = busser::read_csv_headers(&args.csvfile)?;
-    println!("{}", headers.join(", "));
-    if let Some(jsonfile) = args.jsonfile {
-        busser::csv_to_json(&args.csvfile, &jsonfile)?;
-    }
-    if let Some(bcpfile) = args.bcpfile {
-        busser::csv_to_bcp(&args.csvfile, &bcpfile)?;
-    }
-    if let Some(sqltype) = args.sqltype {
-        if let Some(stype) = busser::infer::infer(&sqltype, 0) {
-            println!(
-                "{}({}, {})\nfixed: {}\nindex: {}",
-                stype.name, stype.size, stype.scale, stype.fixed, stype.index
-            );
-        }
-    }
-    */
     Ok(())
 }
 
