@@ -89,7 +89,8 @@ fn schema(args: SchemaCmd) -> Result<()> {
 
 fn output(args: OutputCmd) -> Result<()> {
     if let Some(jsonfile) = args.jsonfile {
-        busser::csv_into(&args.csvfile, &jsonfile, &args.table, args.infer, true, None)?;
+        //busser::csv_into(&args.csvfile, &jsonfile, &args.table, args.infer, true, None)?;
+        busser::csv_into_json(&args.csvfile, &jsonfile, &args.table, None)?;
     }
     if let Some(bcpfile) = args.bcpfile {
         busser::csv_to_bcp(&args.csvfile, &bcpfile)?;

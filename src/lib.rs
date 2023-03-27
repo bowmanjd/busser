@@ -3,10 +3,11 @@ use csv::{Reader, ReaderBuilder};
 use serde_json::{Map, Value};
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::iter::zip;
 use std::path::PathBuf;
 
-mod keywords;
 pub mod infer;
+mod keywords;
 
 fn csv_reader(csvfile: &PathBuf) -> Result<Reader<File>> {
     let rdr = ReaderBuilder::new()
@@ -17,11 +18,7 @@ fn csv_reader(csvfile: &PathBuf) -> Result<Reader<File>> {
 }
 
 // TODO: de-duplicate column names when needed
-pub fn csv_columns(
-    csvfile: &PathBuf,
-    tablename: Option<String>,
-    raw: bool,
-) -> Result<Vec<String>> {
+pub fn csv_columns(csvfile: &PathBuf, tablename: Option<String>, raw: bool) -> Result<Vec<String>> {
     let new_headers: Vec<String>;
     let mut rdr = ReaderBuilder::new()
         .from_path(csvfile)
@@ -73,14 +70,83 @@ pub fn csv_schema(csvfile: &PathBuf, tablename: &str) -> Result<()> {
 
     for result in rdr.records() {
         let row = result?;
-        for i in 0..row_length {
-            let value = &row[i];
+        for (i, value) in row.iter().enumerate() {
             if let Some(sqltype) = infer::infer(value, sqltypes[i].index) {
                 sqltypes[i].merge(&sqltype);
             }
         }
     }
     let schema = schema_string(&headers, &sqltypes);
+    println!(
+        "DROP TABLE IF EXISTS {0};\nCREATE TABLE {0} ({1});",
+        tablename, schema
+    );
+    Ok(())
+}
+
+pub fn csv_into_json(
+    csvfile: &PathBuf,
+    filename: &PathBuf,
+    tablename: &str,
+    page_size: Option<usize>,
+) -> Result<()> {
+    let headers = csv_columns(csvfile, Some(tablename.to_string()), false)?;
+    let row_sep = ", \\\n";
+    let mut json_row: Map<String, Value> = Map::new();
+    let page_size: usize = page_size.unwrap_or(5000);
+    let mut rdr = csv_reader(csvfile)?;
+    let outfile = File::create(filename)?;
+    let mut stream = BufWriter::new(outfile);
+    let mut first_line = true;
+    let row_length: usize = headers.len();
+    let mut sqltypes: Vec<infer::SQLType> = vec![
+        infer::SQLType {
+            ..Default::default()
+        };
+        row_length
+    ];
+
+    for (row_num, result) in rdr.records().enumerate() {
+        if !first_line {
+            write!(stream, "{}", row_sep)?;
+        } else {
+            writeln!(
+                stream,
+                "INSERT INTO {}\nSELECT * FROM OPENJSON('[ \\",
+                tablename
+            )?;
+            first_line = false;
+        }
+        let row = result?;
+        json_row.clear();
+        //for i in 0..row_length {
+        for (i, (column, value)) in zip(&headers, &row).enumerate() {
+            //let column = &headers[i];
+            //let value = &row[i];
+            if let Some(sqltype) = infer::infer(value, sqltypes[i].index) {
+                sqltypes[i].merge(&sqltype);
+            }
+            json_row.insert(column.into(), value.into());
+        }
+        let json_text = serde_json::to_string(&json_row)?.replace("'", "''");
+        //let fields = row.iter().collect::<Vec<&str>>();
+
+        write!(stream, "{}", json_text)?;
+        if ((row_num + 1) % (page_size)) == 0 {
+            writeln!(
+                stream,
+                " \\\n]') WITH ({});\n",
+                schema_string(&headers, &sqltypes)
+            )?;
+            first_line = true;
+        }
+    }
+    let schema = schema_string(&headers, &sqltypes);
+    if !first_line {
+        writeln!(stream, " \\\n]') WITH ({});", schema)?;
+    }
+
+    stream.flush()?;
     println!(
         "DROP TABLE IF EXISTS {0};\nCREATE TABLE {0} ({1});",
         tablename, schema
@@ -139,9 +205,10 @@ pub fn csv_into(
         if json {
             json_row.clear();
         }
-        for i in 0..row_length {
-            let column = &headers[i];
-            let value = &row[i];
+        //for i in 0..row_length {
+        for (i, (column, value)) in zip(&headers, &row).enumerate() {
+            //let column = &headers[i];
+            //let value = &row[i];
             if infer {
                 if let Some(sqltype) = infer::infer(value, sqltypes[i].index) {
                     sqltypes[i].merge(&sqltype);
@@ -185,7 +252,7 @@ fn schema_string(headers: &Vec<String>, sqltypes: &Vec<infer::SQLType>) -> Strin
     for i in 0..row_length {
         let column = &headers[i];
         let sqlt = &sqltypes[i];
-        schema.push_str(&format!("[{}] {}", column, sqlt));
+        schema.push_str(&format!("{} {}", column, sqlt));
         if i < row_length - 1 {
             schema.push_str(", ");
         }
