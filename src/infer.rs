@@ -20,7 +20,7 @@ impl SQLType {
             if self.index == other.index {
                 self.size = other.size.max(self.size);
                 self.scale = other.scale.max(self.scale);
-            } else {
+            } else if self.index < other.index {
                 self.name = other.name.clone();
                 self.index = other.index;
                 self.fixed = other.fixed;
@@ -47,7 +47,11 @@ impl fmt::Display for SQLType {
 
 pub fn infer(value: &str, index: usize) -> Option<SQLType> {
     if value == "" {
-        return None;
+        return Some(SQLType {
+            name: "bit".to_string(),
+            index: 0,
+            ..Default::default()
+        });
     }
     let checks: Vec<&dyn Fn(&str) -> Option<SQLType>> = vec![
         &check_bit,

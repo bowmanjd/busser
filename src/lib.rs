@@ -63,6 +63,7 @@ pub fn csv_schema(csvfile: &PathBuf, tablename: &str) -> Result<()> {
     let row_length: usize = headers.len();
     let mut sqltypes: Vec<infer::SQLType> = vec![
         infer::SQLType {
+            name: "bit".to_string(),
             ..Default::default()
         };
         row_length
@@ -252,6 +253,7 @@ fn schema_string(headers: &Vec<String>, sqltypes: &Vec<infer::SQLType>) -> Strin
     for i in 0..row_length {
         let column = &headers[i];
         let sqlt = &sqltypes[i];
+        println!("{:?}", sqlt);
         schema.push_str(&format!("{} {}", column, sqlt));
         if i < row_length - 1 {
             schema.push_str(", ");
