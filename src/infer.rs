@@ -1,4 +1,24 @@
+use chrono::{NaiveDate, NaiveTime};
 use std::fmt;
+
+const DATE_FORMATS: [&str; 14] = [
+    "%Y-%m-%d",
+    "%Y%m%d",
+    "%m/%d/%Y",
+    "%m-%d-%Y",
+    "%Y.%m.%d",
+    "%Y/%m/%d",
+    "%m.%d.%Y",
+    "%B %d %Y",
+    "%B %d, %Y",
+    "%d %B %Y",
+    "%d %B, %Y",
+    "%d %Y %B",
+    "%Y %B %d",
+    "%Y %d %B",
+];
+
+const TIME_FORMATS: [&str; 6] = ["%T%.f", "%I:%M:%S%.f %p", "%T", "%H:%M", "%r", "%I:%M %p"];
 
 #[derive(Clone, Debug, Default)]
 pub struct SQLType {
@@ -62,6 +82,8 @@ pub fn infer(value: &str, index: usize) -> Option<SQLType> {
         &check_decimal,
         &check_real,
         &check_float,
+        &check_date,
+        &check_time,
         &check_char,
         &check_varchar,
         &check_varcharmax,
@@ -181,6 +203,30 @@ fn check_float(value: &str) -> Option<SQLType> {
     } else {
         None
     }
+}
+
+fn check_date(value: &str) -> Option<SQLType> {
+    for form in DATE_FORMATS {
+        if NaiveDate::parse_from_str(value, form).is_ok() {
+            return Some(SQLType {
+                name: "date".to_string(),
+                ..Default::default()
+            });
+        }
+    }
+    None
+}
+
+fn check_time(value: &str) -> Option<SQLType> {
+    for form in TIME_FORMATS {
+        if NaiveTime::parse_from_str(value, form).is_ok() {
+            return Some(SQLType {
+                name: "time".to_string(),
+                ..Default::default()
+            });
+        }
+    }
+    None
 }
 
 fn check_char(value: &str) -> Option<SQLType> {

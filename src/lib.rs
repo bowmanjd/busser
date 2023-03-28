@@ -253,7 +253,6 @@ fn schema_string(headers: &Vec<String>, sqltypes: &Vec<infer::SQLType>) -> Strin
     for i in 0..row_length {
         let column = &headers[i];
         let sqlt = &sqltypes[i];
-        println!("{:?}", sqlt);
         schema.push_str(&format!("{} {}", column, sqlt));
         if i < row_length - 1 {
             schema.push_str(", ");
