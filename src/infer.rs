@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, NaiveTime};
+use chrono::{NaiveDate, NaiveTime, Timelike};
 use std::fmt;
 
 const DATE_FORMATS: [&str; 14] = [
@@ -19,6 +19,94 @@ const DATE_FORMATS: [&str; 14] = [
 ];
 
 const TIME_FORMATS: [&str; 6] = ["%T%.f", "%I:%M:%S%.f %p", "%T", "%H:%M", "%r", "%I:%M %p"];
+
+const DATETIME_FORMATS: [&str; 85] = [
+    "%Y-%m-%dT%H:%M:%S%.f",
+    "%Y-%m-%d %T%.f",
+    "%Y-%m-%d %I:%M:%S%.f %p",
+    "%Y-%m-%d %T",
+    "%Y-%m-%d %H:%M",
+    "%Y-%m-%d %r",
+    "%Y-%m-%d %I:%M %p",
+    "%Y%m%d %T%.f",
+    "%Y%m%d %I:%M:%S%.f %p",
+    "%Y%m%d %T",
+    "%Y%m%d %H:%M",
+    "%Y%m%d %r",
+    "%Y%m%d %I:%M %p",
+    "%m/%d/%Y %T%.f",
+    "%m/%d/%Y %I:%M:%S%.f %p",
+    "%m/%d/%Y %T",
+    "%m/%d/%Y %H:%M",
+    "%m/%d/%Y %r",
+    "%m/%d/%Y %I:%M %p",
+    "%m-%d-%Y %T%.f",
+    "%m-%d-%Y %I:%M:%S%.f %p",
+    "%m-%d-%Y %T",
+    "%m-%d-%Y %H:%M",
+    "%m-%d-%Y %r",
+    "%m-%d-%Y %I:%M %p",
+    "%Y.%m.%d %T%.f",
+    "%Y.%m.%d %I:%M:%S%.f %p",
+    "%Y.%m.%d %T",
+    "%Y.%m.%d %H:%M",
+    "%Y.%m.%d %r",
+    "%Y.%m.%d %I:%M %p",
+    "%Y/%m/%d %T%.f",
+    "%Y/%m/%d %I:%M:%S%.f %p",
+    "%Y/%m/%d %T",
+    "%Y/%m/%d %H:%M",
+    "%Y/%m/%d %r",
+    "%Y/%m/%d %I:%M %p",
+    "%m.%d.%Y %T%.f",
+    "%m.%d.%Y %I:%M:%S%.f %p",
+    "%m.%d.%Y %T",
+    "%m.%d.%Y %H:%M",
+    "%m.%d.%Y %r",
+    "%m.%d.%Y %I:%M %p",
+    "%B %d %Y %T%.f",
+    "%B %d %Y %I:%M:%S%.f %p",
+    "%B %d %Y %T",
+    "%B %d %Y %H:%M",
+    "%B %d %Y %r",
+    "%B %d %Y %I:%M %p",
+    "%B %d, %Y %T%.f",
+    "%B %d, %Y %I:%M:%S%.f %p",
+    "%B %d, %Y %T",
+    "%B %d, %Y %H:%M",
+    "%B %d, %Y %r",
+    "%B %d, %Y %I:%M %p",
+    "%d %B %Y %T%.f",
+    "%d %B %Y %I:%M:%S%.f %p",
+    "%d %B %Y %T",
+    "%d %B %Y %H:%M",
+    "%d %B %Y %r",
+    "%d %B %Y %I:%M %p",
+    "%d %B, %Y %T%.f",
+    "%d %B, %Y %I:%M:%S%.f %p",
+    "%d %B, %Y %T",
+    "%d %B, %Y %H:%M",
+    "%d %B, %Y %r",
+    "%d %B, %Y %I:%M %p",
+    "%d %Y %B %T%.f",
+    "%d %Y %B %I:%M:%S%.f %p",
+    "%d %Y %B %T",
+    "%d %Y %B %H:%M",
+    "%d %Y %B %r",
+    "%d %Y %B %I:%M %p",
+    "%Y %B %d %T%.f",
+    "%Y %B %d %I:%M:%S%.f %p",
+    "%Y %B %d %T",
+    "%Y %B %d %H:%M",
+    "%Y %B %d %r",
+    "%Y %B %d %I:%M %p",
+    "%Y %d %B %T%.f",
+    "%Y %d %B %I:%M:%S%.f %p",
+    "%Y %d %B %T",
+    "%Y %d %B %H:%M",
+    "%Y %d %B %r",
+    "%Y %d %B %I:%M %p",
+];
 
 #[derive(Clone, Debug, Default)]
 pub struct SQLType {
@@ -84,6 +172,7 @@ pub fn infer(value: &str, index: usize) -> Option<SQLType> {
         &check_float,
         &check_date,
         &check_time,
+        &check_datetime,
         &check_char,
         &check_varchar,
         &check_varcharmax,
@@ -219,9 +308,33 @@ fn check_date(value: &str) -> Option<SQLType> {
 
 fn check_time(value: &str) -> Option<SQLType> {
     for form in TIME_FORMATS {
-        if NaiveTime::parse_from_str(value, form).is_ok() {
+        if let Ok(parsed) = NaiveTime::parse_from_str(&value, form) {
             return Some(SQLType {
                 name: "time".to_string(),
+                size: parsed
+                    .nanosecond()
+                    .to_string()
+                    .trim_end_matches('0')
+                    .len()
+                    .min(7),
+                ..Default::default()
+            });
+        }
+    }
+    None
+}
+
+fn check_datetime(value: &str) -> Option<SQLType> {
+    for form in DATETIME_FORMATS {
+        if let Ok(parsed) = NaiveTime::parse_from_str(&value, form) {
+            return Some(SQLType {
+                name: "datetime2".to_string(),
+                size: parsed
+                    .nanosecond()
+                    .to_string()
+                    .trim_end_matches('0')
+                    .len()
+                    .min(7),
                 ..Default::default()
             });
         }
