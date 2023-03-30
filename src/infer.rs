@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, NaiveTime, Timelike};
+use chrono::{DateTime, NaiveDate, NaiveTime, Timelike};
 use std::fmt;
 
 const DATE_FORMATS: [&str; 14] = [
@@ -174,6 +174,7 @@ pub fn infer(value: &str, index: usize, subindex: usize) -> Option<SQLType> {
         &check_float,
         &check_date,
         &check_time,
+        &check_datetimeoffset,
         &check_datetime,
         &check_char,
         &check_varchar,
@@ -316,6 +317,26 @@ fn check_time(value: &str, subindex: usize) -> Option<SQLType> {
         if let Ok(parsed) = NaiveTime::parse_from_str(&value, form) {
             return Some(SQLType {
                 name: "time".to_string(),
+                subindex,
+                size: parsed
+                    .nanosecond()
+                    .to_string()
+                    .trim_end_matches('0')
+                    .len()
+                    .min(7),
+                ..Default::default()
+            });
+        }
+    }
+    None
+}
+
+fn check_datetimeoffset(value: &str, subindex: usize) -> Option<SQLType> {
+    for i in (subindex..DATETIME_FORMATS.len()).chain(0..subindex) {
+        let form = DATETIME_FORMATS[i];
+        if let Ok(parsed) = DateTime::parse_from_str(&value, &format!("{} %z", form)) {
+            return Some(SQLType {
+                name: "datetimeoffset".to_string(),
                 subindex,
                 size: parsed
                     .nanosecond()
