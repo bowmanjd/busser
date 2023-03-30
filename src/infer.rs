@@ -113,6 +113,7 @@ pub struct SQLType {
     pub name: String,
     pub size: usize,
     pub index: usize,
+    pub subindex: usize,
     pub scale: usize,
     pub fixed: bool,
 }
@@ -126,11 +127,13 @@ impl SQLType {
             self.fixed = false;
         } else {
             if self.index == other.index {
+                self.subindex = other.subindex.max(self.subindex);
                 self.size = other.size.max(self.size);
                 self.scale = other.scale.max(self.scale);
             } else if self.index < other.index {
                 self.name = other.name.clone();
                 self.index = other.index;
+                self.subindex = other.subindex;
                 self.fixed = other.fixed;
                 self.size = other.size;
                 self.scale = other.scale;
@@ -153,15 +156,14 @@ impl fmt::Display for SQLType {
     }
 }
 
-pub fn infer(value: &str, index: usize) -> Option<SQLType> {
+pub fn infer(value: &str, index: usize, subindex: usize) -> Option<SQLType> {
     if value == "" {
         return Some(SQLType {
             name: "bit".to_string(),
-            index: 0,
             ..Default::default()
         });
     }
-    let checks: Vec<&dyn Fn(&str) -> Option<SQLType>> = vec![
+    let checks: Vec<&dyn Fn(&str, usize) -> Option<SQLType>> = vec![
         &check_bit,
         &check_tinyint,
         &check_smallint,
@@ -179,7 +181,7 @@ pub fn infer(value: &str, index: usize) -> Option<SQLType> {
     ];
     let mut index = index.clone();
     while index < checks.len() {
-        if let Some(mut typesize) = checks[index](value) {
+        if let Some(mut typesize) = checks[index](value, subindex) {
             typesize.index = index;
             return Some(typesize);
         } else {
@@ -193,7 +195,7 @@ pub fn infer(value: &str, index: usize) -> Option<SQLType> {
 //
 // infer function walks through functions in order of priority until Some, return Some
 
-fn check_bit(value: &str) -> Option<SQLType> {
+fn check_bit(value: &str, _subindex: usize) -> Option<SQLType> {
     let bit = value.parse::<i8>().unwrap_or(-1);
     if bit == 0 || bit == 1 {
         Some(SQLType {
@@ -205,7 +207,7 @@ fn check_bit(value: &str) -> Option<SQLType> {
     }
 }
 
-fn check_tinyint(value: &str) -> Option<SQLType> {
+fn check_tinyint(value: &str, _subindex: usize) -> Option<SQLType> {
     if value.parse::<u8>().is_ok() {
         Some(SQLType {
             name: "tinyint".to_string(),
@@ -216,7 +218,7 @@ fn check_tinyint(value: &str) -> Option<SQLType> {
     }
 }
 
-fn check_smallint(value: &str) -> Option<SQLType> {
+fn check_smallint(value: &str, _subindex: usize) -> Option<SQLType> {
     if value.parse::<i16>().is_ok() {
         Some(SQLType {
             name: "smallint".to_string(),
@@ -227,7 +229,7 @@ fn check_smallint(value: &str) -> Option<SQLType> {
     }
 }
 
-fn check_int(value: &str) -> Option<SQLType> {
+fn check_int(value: &str, _subindex: usize) -> Option<SQLType> {
     if value.parse::<i32>().is_ok() {
         Some(SQLType {
             name: "int".to_string(),
@@ -238,7 +240,7 @@ fn check_int(value: &str) -> Option<SQLType> {
     }
 }
 
-fn check_bigint(value: &str) -> Option<SQLType> {
+fn check_bigint(value: &str, _subindex: usize) -> Option<SQLType> {
     if value.parse::<i64>().is_ok() {
         Some(SQLType {
             name: "bigint".to_string(),
@@ -249,7 +251,7 @@ fn check_bigint(value: &str) -> Option<SQLType> {
     }
 }
 
-fn check_decimal(value: &str) -> Option<SQLType> {
+fn check_decimal(value: &str, _subindex: usize) -> Option<SQLType> {
     let numeric = value.trim().replace(".", "");
     let length = numeric.len();
     if value.parse::<f64>().is_ok() && numeric.chars().all(char::is_numeric) && length <= 38 {
@@ -272,7 +274,7 @@ fn check_decimal(value: &str) -> Option<SQLType> {
     }
 }
 
-fn check_real(value: &str) -> Option<SQLType> {
+fn check_real(value: &str, _subindex: usize) -> Option<SQLType> {
     if value.parse::<f32>().is_ok() {
         Some(SQLType {
             name: "float(24)".to_string(),
@@ -283,7 +285,7 @@ fn check_real(value: &str) -> Option<SQLType> {
     }
 }
 
-fn check_float(value: &str) -> Option<SQLType> {
+fn check_float(value: &str, _subindex: usize) -> Option<SQLType> {
     if value.parse::<f64>().is_ok() {
         Some(SQLType {
             name: "float".to_string(),
@@ -294,11 +296,13 @@ fn check_float(value: &str) -> Option<SQLType> {
     }
 }
 
-fn check_date(value: &str) -> Option<SQLType> {
-    for form in DATE_FORMATS {
+fn check_date(value: &str, subindex: usize) -> Option<SQLType> {
+    for i in (subindex..DATE_FORMATS.len()).chain(0..subindex) {
+        let form = DATE_FORMATS[i];
         if NaiveDate::parse_from_str(value, form).is_ok() {
             return Some(SQLType {
                 name: "date".to_string(),
+                subindex,
                 ..Default::default()
             });
         }
@@ -306,11 +310,13 @@ fn check_date(value: &str) -> Option<SQLType> {
     None
 }
 
-fn check_time(value: &str) -> Option<SQLType> {
-    for form in TIME_FORMATS {
+fn check_time(value: &str, subindex: usize) -> Option<SQLType> {
+    for i in (subindex..TIME_FORMATS.len()).chain(0..subindex) {
+        let form = TIME_FORMATS[i];
         if let Ok(parsed) = NaiveTime::parse_from_str(&value, form) {
             return Some(SQLType {
                 name: "time".to_string(),
+                subindex,
                 size: parsed
                     .nanosecond()
                     .to_string()
@@ -324,11 +330,13 @@ fn check_time(value: &str) -> Option<SQLType> {
     None
 }
 
-fn check_datetime(value: &str) -> Option<SQLType> {
-    for form in DATETIME_FORMATS {
+fn check_datetime(value: &str, subindex: usize) -> Option<SQLType> {
+    for i in (subindex..DATETIME_FORMATS.len()).chain(0..subindex) {
+        let form = DATETIME_FORMATS[i];
         if let Ok(parsed) = NaiveTime::parse_from_str(&value, form) {
             return Some(SQLType {
                 name: "datetime2".to_string(),
+                subindex,
                 size: parsed
                     .nanosecond()
                     .to_string()
@@ -342,7 +350,7 @@ fn check_datetime(value: &str) -> Option<SQLType> {
     None
 }
 
-fn check_char(value: &str) -> Option<SQLType> {
+fn check_char(value: &str, _subindex: usize) -> Option<SQLType> {
     if value.len() <= 8000 {
         Some(SQLType {
             name: "char".to_string(),
@@ -355,7 +363,7 @@ fn check_char(value: &str) -> Option<SQLType> {
     }
 }
 
-fn check_varchar(value: &str) -> Option<SQLType> {
+fn check_varchar(value: &str, _subindex: usize) -> Option<SQLType> {
     if value.len() <= 8000 {
         Some(SQLType {
             name: "varchar".to_string(),
@@ -367,7 +375,7 @@ fn check_varchar(value: &str) -> Option<SQLType> {
     }
 }
 
-fn check_varcharmax(value: &str) -> Option<SQLType> {
+fn check_varcharmax(value: &str, _subindex: usize) -> Option<SQLType> {
     if value.len() > 8000 {
         Some(SQLType {
             name: "varchar(max)".to_string(),

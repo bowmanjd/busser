@@ -72,7 +72,7 @@ pub fn csv_schema(csvfile: &PathBuf, tablename: &str) -> Result<()> {
     for result in rdr.records() {
         let row = result?;
         for (i, value) in row.iter().enumerate() {
-            if let Some(sqltype) = infer::infer(value, sqltypes[i].index) {
+            if let Some(sqltype) = infer::infer(value, sqltypes[i].index, sqltypes[i].subindex) {
                 sqltypes[i].merge(&sqltype);
             }
         }
@@ -124,7 +124,7 @@ pub fn csv_into_json(
         for (i, (column, value)) in zip(&headers, &row).enumerate() {
             //let column = &headers[i];
             //let value = &row[i];
-            if let Some(sqltype) = infer::infer(value, sqltypes[i].index) {
+            if let Some(sqltype) = infer::infer(value, sqltypes[i].index, sqltypes[i].subindex) {
                 sqltypes[i].merge(&sqltype);
             }
             json_row.insert(column.into(), value.into());
@@ -211,7 +211,7 @@ pub fn csv_into(
             //let column = &headers[i];
             //let value = &row[i];
             if infer {
-                if let Some(sqltype) = infer::infer(value, sqltypes[i].index) {
+                if let Some(sqltype) = infer::infer(value, sqltypes[i].index, sqltypes[i].subindex) {
                     sqltypes[i].merge(&sqltype);
                 }
             }
