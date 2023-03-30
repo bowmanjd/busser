@@ -1,6 +1,24 @@
 use chrono::{DateTime, NaiveDate, NaiveTime, Timelike};
 use std::fmt;
 
+const CHECKS: [&fn(&str, usize) -> Option<SQLType>; 15] = [
+    &(check_bit as fn(&str, usize) -> Option<SQLType>),
+    &(check_tinyint as fn(&str, usize) -> Option<SQLType>),
+    &(check_smallint as fn(&str, usize) -> Option<SQLType>),
+    &(check_int as fn(&str, usize) -> Option<SQLType>),
+    &(check_bigint as fn(&str, usize) -> Option<SQLType>),
+    &(check_decimal as fn(&str, usize) -> Option<SQLType>),
+    &(check_real as fn(&str, usize) -> Option<SQLType>),
+    &(check_float as fn(&str, usize) -> Option<SQLType>),
+    &(check_date as fn(&str, usize) -> Option<SQLType>),
+    &(check_time as fn(&str, usize) -> Option<SQLType>),
+    &(check_datetimeoffset as fn(&str, usize) -> Option<SQLType>),
+    &(check_datetime as fn(&str, usize) -> Option<SQLType>),
+    &(check_char as fn(&str, usize) -> Option<SQLType>),
+    &(check_varchar as fn(&str, usize) -> Option<SQLType>),
+    &(check_varcharmax as fn(&str, usize) -> Option<SQLType>),
+];
+
 const DATE_FORMATS: [&str; 14] = [
     "%Y-%m-%d",
     "%Y%m%d",
@@ -163,26 +181,9 @@ pub fn infer(value: &str, index: usize, subindex: usize) -> Option<SQLType> {
             ..Default::default()
         });
     }
-    let checks: Vec<&dyn Fn(&str, usize) -> Option<SQLType>> = vec![
-        &check_bit,
-        &check_tinyint,
-        &check_smallint,
-        &check_int,
-        &check_bigint,
-        &check_decimal,
-        &check_real,
-        &check_float,
-        &check_date,
-        &check_time,
-        &check_datetimeoffset,
-        &check_datetime,
-        &check_char,
-        &check_varchar,
-        &check_varcharmax,
-    ];
     let mut index = index.clone();
-    while index < checks.len() {
-        if let Some(mut typesize) = checks[index](value, subindex) {
+    while index < CHECKS.len() {
+        if let Some(mut typesize) = CHECKS[index](value, subindex) {
             typesize.index = index;
             return Some(typesize);
         } else {
