@@ -1,0 +1,6 @@
+CheckinTime,"Group Num",EmailAddress,First-Name,"Last Name",unused,StartDate,EndDatetime,HawaiiTime
+08:30am,1,elfried@rmail.com,Jonathan,Smith,,2018-02-27,2019-02-28 04:30,2019-02-28 04:30 +10:00
+9:30pm,2,bigspender@bucks.com,"""Mister""",Bowlen,,2020-12-01,2022-03-15 04:30:00.2,2022-03-15 04:30:00.2 +10:00
+08:30:00.145,2,phil@anthropist.org,Walter,Zarathustra,,"Jun 2, 2022","Jun 2, 2023 05:00 pm","Jun 2, 2023 05:00 pm +10:00"
+8:30am,3,reallylongidentifier@fancydomainname.com,,Fancy,,5/14/2021,,
+

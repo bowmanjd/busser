@@ -407,3 +407,26 @@ fn check_varcharmax(value: &str, _subindex: usize) -> Option<SQLType> {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn checkbit_succeeds_zero() {
+        let attempt = check_bit("0", 0).unwrap();
+        assert!(attempt.name == "bit");
+    }
+
+    #[test]
+    fn checkbit_succeeds_one() {
+        let attempt = check_bit("1", 0).unwrap();
+        assert!(attempt.name == "bit");
+    }
+
+    #[test]
+    fn checkbit_fails_one() {
+        let attempt = check_bit("2", 0);
+        assert!(attempt.is_none());
+    }
+}

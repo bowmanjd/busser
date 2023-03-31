@@ -13,7 +13,6 @@ fn csv_reader(csvfile: &PathBuf) -> Result<Reader<File>> {
     let rdr = ReaderBuilder::new()
         .from_path(csvfile)
         .with_context(|| format!("Failed to read csv from {:?}", csvfile))?;
-    // rdr.set_headers(new_headers);
     Ok(rdr)
 }
 
@@ -57,7 +56,7 @@ pub fn csv_columns(csvfile: &PathBuf, tablename: Option<String>, raw: bool) -> R
     Ok(new_headers)
 }
 
-pub fn csv_schema(csvfile: &PathBuf, tablename: &str) -> Result<()> {
+pub fn csv_schema(csvfile: &PathBuf, tablename: &str) -> Result<String> {
     let headers = csv_columns(csvfile, Some(tablename.to_string()), false)?;
     let mut rdr = csv_reader(csvfile)?;
     let row_length: usize = headers.len();
@@ -78,11 +77,10 @@ pub fn csv_schema(csvfile: &PathBuf, tablename: &str) -> Result<()> {
         }
     }
     let schema = schema_string(&headers, &sqltypes);
-    println!(
+    Ok(format!(
         "DROP TABLE IF EXISTS {0};\nCREATE TABLE {0} ({1});",
         tablename, schema
-    );
-    Ok(())
+    ))
 }
 
 pub fn csv_into_json(
@@ -211,7 +209,8 @@ pub fn csv_into(
             //let column = &headers[i];
             //let value = &row[i];
             if infer {
-                if let Some(sqltype) = infer::infer(value, sqltypes[i].index, sqltypes[i].subindex) {
+                if let Some(sqltype) = infer::infer(value, sqltypes[i].index, sqltypes[i].subindex)
+                {
                     sqltypes[i].merge(&sqltype);
                 }
             }
@@ -290,8 +289,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+    fn nonexistent_csv_file() {
+        let attempt = csv_reader(&PathBuf::from("No_Such_File.csv"));
+        assert!(attempt.is_err());
     }
 }

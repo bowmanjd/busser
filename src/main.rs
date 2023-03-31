@@ -83,7 +83,8 @@ fn columns(args: ColumnsCmd) -> Result<()> {
 }
 
 fn schema(args: SchemaCmd) -> Result<()> {
-    busser::csv_schema(&args.csvfile, &args.table)?;
+    let create_table = busser::csv_schema(&args.csvfile, &args.table)?;
+    println!("{}", create_table);
     Ok(())
 }
 
