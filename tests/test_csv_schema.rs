@@ -2,14 +2,13 @@ mod helper;
 
 #[test]
 fn test_schema_returns() {
-    let table = busser::csv_schema(&helper::get_test_file("sample_all_1.csv"), "test").unwrap_or("".to_string());
-    assert!(table.contains("CREATE TABLE test"));
-    /*
+    let table = busser::csv_schema(&helper::get_test_file("sample_all_1.csv"), "test")
+        .unwrap_or("".to_string());
     assert_eq!(
         table,
-        "DROP TABLE IF EXISTS test;\nCREATE TABLE test (CheckinTime time(3), Group_Num tinyint, \
-        EmailAddress varchar(40), First_Name varchar(8), Last_Name varchar(11), unused bit, \
-        StartDate date, EndDatetime datetime2(1), HawaiiTime datetimeoffset(1));"
+        "DROP TABLE IF EXISTS test;\nCREATE TABLE test (unused bit, bit bit, tinyint \
+        tinyint, smallint smallint, int int, bigint bigint, decimal numeric(8, 5), real float(24), \
+        float float, date date, time time(0), datetimeoffset datetimeoffset(5), datetime \
+        datetime2(2), char char(7), varchar varchar(5), varcharmax varchar(max));"
     );
-    */
 }
