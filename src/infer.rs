@@ -1,5 +1,7 @@
-use chrono::{DateTime, NaiveDate, NaiveTime, Timelike};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Timelike};
 use std::fmt;
+
+mod formats;
 
 const CHECKS: [&fn(&str, usize) -> Option<SQLType>; 15] = [
     &(check_bit as fn(&str, usize) -> Option<SQLType>),
@@ -12,118 +14,11 @@ const CHECKS: [&fn(&str, usize) -> Option<SQLType>; 15] = [
     &(check_float as fn(&str, usize) -> Option<SQLType>),
     &(check_date as fn(&str, usize) -> Option<SQLType>),
     &(check_time as fn(&str, usize) -> Option<SQLType>),
-    &(check_datetimeoffset as fn(&str, usize) -> Option<SQLType>),
     &(check_datetime as fn(&str, usize) -> Option<SQLType>),
+    &(check_datetimeoffset as fn(&str, usize) -> Option<SQLType>),
     &(check_char as fn(&str, usize) -> Option<SQLType>),
     &(check_varchar as fn(&str, usize) -> Option<SQLType>),
     &(check_varcharmax as fn(&str, usize) -> Option<SQLType>),
-];
-
-const DATE_FORMATS: [&str; 14] = [
-    "%Y-%m-%d",
-    "%Y%m%d",
-    "%m/%d/%Y",
-    "%m-%d-%Y",
-    "%Y.%m.%d",
-    "%Y/%m/%d",
-    "%m.%d.%Y",
-    "%B %d %Y",
-    "%B %d, %Y",
-    "%d %B %Y",
-    "%d %B, %Y",
-    "%d %Y %B",
-    "%Y %B %d",
-    "%Y %d %B",
-];
-
-const TIME_FORMATS: [&str; 6] = ["%T%.f", "%I:%M:%S%.f %p", "%T", "%H:%M", "%r", "%I:%M %p"];
-
-const DATETIME_FORMATS: [&str; 85] = [
-    "%Y-%m-%dT%H:%M:%S%.f",
-    "%Y-%m-%d %T%.f",
-    "%Y-%m-%d %I:%M:%S%.f %p",
-    "%Y-%m-%d %T",
-    "%Y-%m-%d %H:%M",
-    "%Y-%m-%d %r",
-    "%Y-%m-%d %I:%M %p",
-    "%Y%m%d %T%.f",
-    "%Y%m%d %I:%M:%S%.f %p",
-    "%Y%m%d %T",
-    "%Y%m%d %H:%M",
-    "%Y%m%d %r",
-    "%Y%m%d %I:%M %p",
-    "%m/%d/%Y %T%.f",
-    "%m/%d/%Y %I:%M:%S%.f %p",
-    "%m/%d/%Y %T",
-    "%m/%d/%Y %H:%M",
-    "%m/%d/%Y %r",
-    "%m/%d/%Y %I:%M %p",
-    "%m-%d-%Y %T%.f",
-    "%m-%d-%Y %I:%M:%S%.f %p",
-    "%m-%d-%Y %T",
-    "%m-%d-%Y %H:%M",
-    "%m-%d-%Y %r",
-    "%m-%d-%Y %I:%M %p",
-    "%Y.%m.%d %T%.f",
-    "%Y.%m.%d %I:%M:%S%.f %p",
-    "%Y.%m.%d %T",
-    "%Y.%m.%d %H:%M",
-    "%Y.%m.%d %r",
-    "%Y.%m.%d %I:%M %p",
-    "%Y/%m/%d %T%.f",
-    "%Y/%m/%d %I:%M:%S%.f %p",
-    "%Y/%m/%d %T",
-    "%Y/%m/%d %H:%M",
-    "%Y/%m/%d %r",
-    "%Y/%m/%d %I:%M %p",
-    "%m.%d.%Y %T%.f",
-    "%m.%d.%Y %I:%M:%S%.f %p",
-    "%m.%d.%Y %T",
-    "%m.%d.%Y %H:%M",
-    "%m.%d.%Y %r",
-    "%m.%d.%Y %I:%M %p",
-    "%B %d %Y %T%.f",
-    "%B %d %Y %I:%M:%S%.f %p",
-    "%B %d %Y %T",
-    "%B %d %Y %H:%M",
-    "%B %d %Y %r",
-    "%B %d %Y %I:%M %p",
-    "%B %d, %Y %T%.f",
-    "%B %d, %Y %I:%M:%S%.f %p",
-    "%B %d, %Y %T",
-    "%B %d, %Y %H:%M",
-    "%B %d, %Y %r",
-    "%B %d, %Y %I:%M %p",
-    "%d %B %Y %T%.f",
-    "%d %B %Y %I:%M:%S%.f %p",
-    "%d %B %Y %T",
-    "%d %B %Y %H:%M",
-    "%d %B %Y %r",
-    "%d %B %Y %I:%M %p",
-    "%d %B, %Y %T%.f",
-    "%d %B, %Y %I:%M:%S%.f %p",
-    "%d %B, %Y %T",
-    "%d %B, %Y %H:%M",
-    "%d %B, %Y %r",
-    "%d %B, %Y %I:%M %p",
-    "%d %Y %B %T%.f",
-    "%d %Y %B %I:%M:%S%.f %p",
-    "%d %Y %B %T",
-    "%d %Y %B %H:%M",
-    "%d %Y %B %r",
-    "%d %Y %B %I:%M %p",
-    "%Y %B %d %T%.f",
-    "%Y %B %d %I:%M:%S%.f %p",
-    "%Y %B %d %T",
-    "%Y %B %d %H:%M",
-    "%Y %B %d %r",
-    "%Y %B %d %I:%M %p",
-    "%Y %d %B %T%.f",
-    "%Y %d %B %I:%M:%S%.f %p",
-    "%Y %d %B %T",
-    "%Y %d %B %H:%M",
-    "%Y %d %B %r",
-    "%Y %d %B %I:%M %p",
 ];
 
 #[derive(Clone, Debug, Default)]
@@ -163,7 +58,7 @@ impl SQLType {
 impl fmt::Display for SQLType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut name = self.name.clone();
-        if self.size > 0 {
+        if self.size > 0 || self.name.contains("time") {
             name.push_str(&format!("({}", self.size));
             if self.scale > 0 {
                 name.push_str(&format!(", {}", self.scale));
@@ -277,14 +172,15 @@ fn check_decimal(value: &str, _subindex: usize) -> Option<SQLType> {
 }
 
 fn check_real(value: &str, _subindex: usize) -> Option<SQLType> {
-    if value.parse::<f32>().is_ok() {
-        Some(SQLType {
-            name: "float(24)".to_string(),
-            ..Default::default()
-        })
-    } else {
-        None
+    if let Ok(real) = value.parse::<f32>() {
+        if real.is_normal() {
+            return Some(SQLType {
+                name: "float(24)".to_string(),
+                ..Default::default()
+            });
+        }
     }
+    None
 }
 
 fn check_float(value: &str, _subindex: usize) -> Option<SQLType> {
@@ -299,8 +195,8 @@ fn check_float(value: &str, _subindex: usize) -> Option<SQLType> {
 }
 
 fn check_date(value: &str, subindex: usize) -> Option<SQLType> {
-    for i in (subindex..DATE_FORMATS.len()).chain(0..subindex) {
-        let form = DATE_FORMATS[i];
+    for i in (subindex..formats::DATE_FORMATS.len()).chain(0..subindex) {
+        let form = formats::DATE_FORMATS[i];
         if NaiveDate::parse_from_str(value, form).is_ok() {
             return Some(SQLType {
                 name: "date".to_string(),
@@ -312,19 +208,23 @@ fn check_date(value: &str, subindex: usize) -> Option<SQLType> {
     None
 }
 
+fn time_precision(nanoseconds: u32) -> usize {
+    if nanoseconds == 0 {
+        0
+    } else {
+        let nanos = nanoseconds.to_string();
+        (nanos.trim_end_matches('0').len() + 9 - nanos.len()).min(7)
+    }
+}
+
 fn check_time(value: &str, subindex: usize) -> Option<SQLType> {
-    for i in (subindex..TIME_FORMATS.len()).chain(0..subindex) {
-        let form = TIME_FORMATS[i];
+    for i in (subindex..formats::TIME_FORMATS.len()).chain(0..subindex) {
+        let form = formats::TIME_FORMATS[i];
         if let Ok(parsed) = NaiveTime::parse_from_str(&value, form) {
             return Some(SQLType {
                 name: "time".to_string(),
                 subindex,
-                size: parsed
-                    .nanosecond()
-                    .to_string()
-                    .trim_end_matches('0')
-                    .len()
-                    .min(7),
+                size: time_precision(parsed.nanosecond()),
                 ..Default::default()
             });
         }
@@ -333,18 +233,16 @@ fn check_time(value: &str, subindex: usize) -> Option<SQLType> {
 }
 
 fn check_datetimeoffset(value: &str, subindex: usize) -> Option<SQLType> {
-    for i in (subindex..DATETIME_FORMATS.len()).chain(0..subindex) {
-        let form = DATETIME_FORMATS[i];
-        if let Ok(parsed) = DateTime::parse_from_str(&value, &format!("{} %z", form)) {
+    for i in (subindex..formats::DATETIMEOFFSET_FORMATS.len()).chain(0..subindex) {
+        let form = formats::DATETIMEOFFSET_FORMATS[i];
+        if let Ok(parsed) = DateTime::parse_from_str(&value, &form).or(DateTime::parse_from_str(
+            &format!("{}+00:00", &value),
+            &form,
+        )) {
             return Some(SQLType {
                 name: "datetimeoffset".to_string(),
                 subindex,
-                size: parsed
-                    .nanosecond()
-                    .to_string()
-                    .trim_end_matches('0')
-                    .len()
-                    .min(7),
+                size: time_precision(parsed.nanosecond()),
                 ..Default::default()
             });
         }
@@ -353,18 +251,13 @@ fn check_datetimeoffset(value: &str, subindex: usize) -> Option<SQLType> {
 }
 
 fn check_datetime(value: &str, subindex: usize) -> Option<SQLType> {
-    for i in (subindex..DATETIME_FORMATS.len()).chain(0..subindex) {
-        let form = DATETIME_FORMATS[i];
-        if let Ok(parsed) = NaiveTime::parse_from_str(&value, form) {
+    for i in (subindex..formats::DATETIME_FORMATS.len()).chain(0..subindex) {
+        let form = formats::DATETIME_FORMATS[i];
+        if let Ok(parsed) = NaiveDateTime::parse_from_str(&value, form) {
             return Some(SQLType {
                 name: "datetime2".to_string(),
                 subindex,
-                size: parsed
-                    .nanosecond()
-                    .to_string()
-                    .trim_end_matches('0')
-                    .len()
-                    .min(7),
+                size: time_precision(parsed.nanosecond()),
                 ..Default::default()
             });
         }
@@ -428,5 +321,36 @@ mod tests {
     fn checkbit_fails_one() {
         let attempt = check_bit("2", 0);
         assert!(attempt.is_none());
+    }
+
+    #[test]
+    fn datetime_if_no_tz() {
+        let attempt = check_datetime("2002-11-09T07:18:21", 0);
+        assert!(attempt.is_some());
+    }
+
+    #[test]
+    fn datetimeoffset_if_no_tz() {
+        let attempt = check_datetimeoffset("2002-11-09T07:18:21", 0);
+        assert!(attempt.is_some());
+    }
+
+    #[test]
+    fn not_datetime_if_tz() {
+        let attempt = check_datetime("2002-11-09T07:18:21+05:00", 0);
+        assert!(attempt.is_none());
+    }
+
+    #[test]
+    fn utc_datetimeoffset() {
+        let attempt = check_datetimeoffset("2002-11-09T07:18:21Z", 0);
+        assert!(attempt.is_some());
+    }
+
+    #[test]
+    fn precision_count() {
+        assert_eq!(3, check_time("01:00:00.012", 0).unwrap().size);
+        assert_eq!(0, check_time("01:00:00.0", 0).unwrap().size);
+        assert_eq!(7, check_time("01:00:00.012345678", 0).unwrap().size);
     }
 }
