@@ -307,44 +307,37 @@ mod tests {
 
     #[test]
     fn checkbit_succeeds_zero() {
-        let attempt = check_bit("0", 0).unwrap();
-        assert!(attempt.name == "bit");
+        assert_eq!(check_bit("0", 0).unwrap().name, "bit");
     }
 
     #[test]
     fn checkbit_succeeds_one() {
-        let attempt = check_bit("1", 0).unwrap();
-        assert!(attempt.name == "bit");
+        assert_eq!(check_bit("1", 0).unwrap().name, "bit");
     }
 
     #[test]
     fn checkbit_fails_one() {
-        let attempt = check_bit("2", 0);
-        assert!(attempt.is_none());
+        assert!(check_bit("2", 0).is_none());
     }
 
     #[test]
     fn datetime_if_no_tz() {
-        let attempt = check_datetime("2002-11-09T07:18:21", 0);
-        assert!(attempt.is_some());
+        assert!(check_datetime("2002-11-09T07:18:21", 0).is_some());
     }
 
     #[test]
     fn datetimeoffset_if_no_tz() {
-        let attempt = check_datetimeoffset("2002-11-09T07:18:21", 0);
-        assert!(attempt.is_some());
+        assert!(check_datetimeoffset("2002-11-09T07:18:21", 0).is_some());
     }
 
     #[test]
     fn not_datetime_if_tz() {
-        let attempt = check_datetime("2002-11-09T07:18:21+05:00", 0);
-        assert!(attempt.is_none());
+        assert!(check_datetime("2002-11-09T07:18:21+05:00", 0).is_none());
     }
 
     #[test]
     fn utc_datetimeoffset() {
-        let attempt = check_datetimeoffset("2002-11-09T07:18:21Z", 0);
-        assert!(attempt.is_some());
+        assert!(check_datetimeoffset("2002-11-09T07:18:21Z", 0).is_some());
     }
 
     #[test]

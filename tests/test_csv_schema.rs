@@ -3,7 +3,7 @@ mod helper;
 #[test]
 fn test_schema_returns() {
     let table = busser::csv_schema(&helper::get_test_file("sample_all_1.csv"), "test")
-        .unwrap_or("".to_string());
+        .unwrap();
     assert_eq!(
         table,
         "DROP TABLE IF EXISTS test;\nCREATE TABLE test (unused bit, bit bit, tinyint \
