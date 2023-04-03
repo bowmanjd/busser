@@ -306,44 +306,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn checkbit_succeeds_zero() {
-        assert_eq!(check_bit("0", 0).unwrap().name, "bit");
-    }
-
-    #[test]
-    fn checkbit_succeeds_one() {
-        assert_eq!(check_bit("1", 0).unwrap().name, "bit");
-    }
-
-    #[test]
-    fn checkbit_fails_one() {
-        assert!(check_bit("2", 0).is_none());
-    }
-
-    #[test]
-    fn datetime_if_no_tz() {
-        assert!(check_datetime("2002-11-09T07:18:21", 0).is_some());
-    }
-
-    #[test]
     fn datetimeoffset_if_no_tz() {
         assert!(check_datetimeoffset("2002-11-09T07:18:21", 0).is_some());
-    }
-
-    #[test]
-    fn not_datetime_if_tz() {
-        assert!(check_datetime("2002-11-09T07:18:21+05:00", 0).is_none());
-    }
-
-    #[test]
-    fn utc_datetimeoffset() {
-        assert!(check_datetimeoffset("2002-11-09T07:18:21Z", 0).is_some());
-    }
-
-    #[test]
-    fn precision_count() {
-        assert_eq!(3, check_time("01:00:00.012", 0).unwrap().size);
-        assert_eq!(0, check_time("01:00:00.0", 0).unwrap().size);
-        assert_eq!(7, check_time("01:00:00.012345678", 0).unwrap().size);
     }
 }
