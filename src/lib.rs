@@ -154,14 +154,22 @@ pub fn csv_into_json(
 }
 
 fn field_processor_json(stream: &mut BufWriter<File>, column: &str, value: &str) -> Result<()> {
-    write!(
-        stream,
-        "\"{}\": \"{}\"",
-        column,
-        value
+    let mut new_value = String::new();
+    if value.is_empty() {
+        new_value.push_str("null");
+    } else {
+        new_value.push('"');
+        new_value.push_str(&value
             .replace("\\", "\\\\")
             .replace("\"", "\\\"")
-            .replace("'", "''")
+            .replace("'", "''"));
+        new_value.push('"');
+    }
+    write!(
+        stream,
+        "\"{}\": {}",
+        column,
+        new_value
     )?;
     Ok(())
 }
@@ -178,7 +186,7 @@ fn page_header_json(
         }
         write!(stream, "    {}", col)?;
     }
-    writeln!(stream, "\nFROM OPENJSON('[ \\")?;
+    write!(stream, "\nFROM OPENJSON('[ \\\n    {{")?;
     Ok(())
 }
 
@@ -189,7 +197,7 @@ fn page_footer_json(
     sqltypes: &Vec<infer::SQLType>,
 ) -> Result<()> {
     let schema = schema_string(columns, sqltypes);
-    writeln!(stream, " \\\n]') WITH ({});", schema)?;
+    writeln!(stream, "}} \\\n]') WITH ({});", schema)?;
     Ok(())
 }
 
@@ -204,7 +212,7 @@ pub fn csv_into_json2(
         filename,
         tablename,
         true,
-        ", \\\n    ",
+        "}, \\\n    {",
         ", ",
         &(field_processor_json as fn(&mut BufWriter<File>, &str, &str) -> Result<()>),
         page_size,
