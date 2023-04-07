@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use csv::{Reader, ReaderBuilder};
-use serde_json::{Map, Value};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::iter::zip;
@@ -83,73 +82,8 @@ pub fn csv_schema(csvfile: &PathBuf, tablename: &str) -> Result<String> {
     ))
 }
 
-pub fn csv_into_json(
-    csvfile: &PathBuf,
-    filename: &PathBuf,
-    tablename: &str,
-    page_size: Option<usize>,
-) -> Result<()> {
-    let headers = csv_columns(csvfile, Some(tablename), false)?;
-    let row_sep = ", \\\n";
-    let mut json_row: Map<String, Value> = Map::new();
-    let page_size: usize = page_size.unwrap_or(5000);
-    let mut rdr = csv_reader(csvfile)?;
-    let outfile = File::create(filename)?;
-    let mut stream = BufWriter::new(outfile);
-    let mut first_line = true;
-    let row_length: usize = headers.len();
-    let mut sqltypes: Vec<infer::SQLType> = vec![
-        infer::SQLType {
-            ..Default::default()
-        };
-        row_length
-    ];
-
-    for (row_num, result) in rdr.records().enumerate() {
-        if !first_line {
-            write!(stream, "{}", row_sep)?;
-        } else {
-            writeln!(
-                stream,
-                "INSERT INTO {}\nSELECT * FROM OPENJSON('[ \\",
-                tablename
-            )?;
-            first_line = false;
-        }
-        let row = result?;
-        json_row.clear();
-        //for i in 0..row_length {
-        for (i, (column, value)) in zip(&headers, &row).enumerate() {
-            //let column = &headers[i];
-            //let value = &row[i];
-            if let Some(sqltype) = infer::infer(value, sqltypes[i].index, sqltypes[i].subindex) {
-                sqltypes[i].merge(&sqltype);
-            }
-            json_row.insert(column.into(), value.into());
-        }
-        let json_text = serde_json::to_string(&json_row)?.replace("'", "''");
-        //let fields = row.iter().collect::<Vec<&str>>();
-
-        write!(stream, "{}", json_text)?;
-        if ((row_num + 1) % (page_size)) == 0 {
-            writeln!(
-                stream,
-                " \\\n]') WITH ({});\n",
-                schema_string(&headers, &sqltypes)
-            )?;
-            first_line = true;
-        }
-    }
-    let schema = schema_string(&headers, &sqltypes);
-    if !first_line {
-        writeln!(stream, " \\\n]') WITH ({});", schema)?;
-    }
-
-    stream.flush()?;
-    println!(
-        "DROP TABLE IF EXISTS {0};\nCREATE TABLE {0} ({1});",
-        tablename, schema
-    );
+fn field_processor_bcp(stream: &mut BufWriter<File>, _column: &str, value: &str) -> Result<()> {
+    write!(stream, "{}", value)?;
     Ok(())
 }
 
@@ -159,18 +93,26 @@ fn field_processor_json(stream: &mut BufWriter<File>, column: &str, value: &str)
         new_value.push_str("null");
     } else {
         new_value.push('"');
-        new_value.push_str(&value
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("'", "''"));
+        for char in value.chars() {
+            match char {
+                '\\' => new_value.push_str("\\\\"), 
+                '"' => new_value.push_str("\\\""), 
+                '\'' => new_value.push_str("''"), 
+                _ => new_value.push(char),
+            }
+        }
+
+        /*
+        new_value.push_str(
+            &value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("'", "''"),
+        );
+        */
         new_value.push('"');
     }
-    write!(
-        stream,
-        "\"{}\": {}",
-        column,
-        new_value
-    )?;
+    write!(stream, "\"{}\": {}", column, new_value)?;
     Ok(())
 }
 
@@ -201,7 +143,28 @@ fn page_footer_json(
     Ok(())
 }
 
-pub fn csv_into_json2(
+pub fn csv_into_bcp(
+    csvfile: &PathBuf,
+    filename: &PathBuf,
+    tablename: &str,
+    infer: bool,
+    page_size: usize,
+) -> Result<()> {
+    csv_into(
+        csvfile,
+        filename,
+        tablename,
+        infer,
+        "\x1E",
+        "\x1F",
+        &(field_processor_bcp as fn(&mut BufWriter<File>, &str, &str) -> Result<()>),
+        page_size,
+        None,
+        None,
+    )
+}
+
+pub fn csv_into_json(
     csvfile: &PathBuf,
     filename: &PathBuf,
     tablename: &str,
@@ -217,12 +180,21 @@ pub fn csv_into_json2(
         &(field_processor_json as fn(&mut BufWriter<File>, &str, &str) -> Result<()>),
         page_size,
         Some(&(page_header_json as fn(&mut BufWriter<File>, &str, &Vec<String>) -> Result<()>)),
-        Some(&(page_footer_json as fn(&mut BufWriter<File>, &str, &Vec<String>, &Vec<infer::SQLType>) -> Result<()>)),
+        Some(
+            &(page_footer_json
+                as fn(
+                    &mut BufWriter<File>,
+                    &str,
+                    &Vec<String>,
+                    &Vec<infer::SQLType>,
+                ) -> Result<()>),
+        ),
     )
 }
-pub fn csv_into(
+
+fn csv_into(
     csvfile: &PathBuf,
-    filename: &PathBuf,
+    outpath: &PathBuf,
     tablename: &str,
     infer: bool,
     row_sep: &str,
@@ -230,11 +202,13 @@ pub fn csv_into(
     field_processor: &fn(&mut BufWriter<File>, &str, &str) -> Result<()>,
     page_size: usize,
     page_header: Option<&fn(&mut BufWriter<File>, &str, &Vec<String>) -> Result<()>>,
-    page_footer: Option<&fn(&mut BufWriter<File>, &str, &Vec<String>, &Vec<infer::SQLType>) -> Result<()>>,
+    page_footer: Option<
+        &fn(&mut BufWriter<File>, &str, &Vec<String>, &Vec<infer::SQLType>) -> Result<()>,
+    >,
 ) -> Result<()> {
     let columns = csv_columns(csvfile, Some(tablename), false)?;
     let mut rdr = csv_reader(csvfile)?;
-    let outfile = File::create(filename)?;
+    let outfile = File::create(outpath)?;
     let mut stream = BufWriter::new(outfile);
     let row_length: usize = columns.len();
     let mut sqltypes: Vec<infer::SQLType> = vec![
@@ -252,10 +226,7 @@ pub fn csv_into(
             page_header(&mut stream, tablename, &columns)?;
         }
         let row = result?;
-        //for i in 0..row_length {
         for (i, (column, value)) in zip(&columns, &row).enumerate() {
-            //let column = &headers[i];
-            //let value = &row[i];
             if infer {
                 if let Some(sqltype) = infer::infer(value, sqltypes[i].index, sqltypes[i].subindex)
                 {
@@ -285,38 +256,15 @@ pub fn csv_into(
     Ok(())
 }
 
-fn schema_string(headers: &Vec<String>, sqltypes: &Vec<infer::SQLType>) -> String {
-    let row_length = headers.len();
+fn schema_string(columns: &Vec<String>, sqltypes: &Vec<infer::SQLType>) -> String {
     let mut schema = String::new();
-    for i in 0..row_length {
-        let column = &headers[i];
-        let sqlt = &sqltypes[i];
-        schema.push_str(&format!("{} {}", column, sqlt));
-        if i < row_length - 1 {
+    for (i, (column, sqlt)) in zip(columns, sqltypes).enumerate() {
+        if i > 0 {
             schema.push_str(", ");
         }
+        schema.push_str(&format!("{} {}", column, sqlt));
     }
     schema
-}
-
-pub fn csv_to_bcp(csvfile: &PathBuf, bcpfile: &PathBuf) -> Result<()> {
-    let mut rdr = csv_reader(csvfile)?;
-    let outfile = File::create(bcpfile)?;
-    let mut stream = BufWriter::new(outfile);
-    let mut first_line = true;
-    for result in rdr.records() {
-        if !first_line {
-            write!(stream, "\x1E")?;
-        } else {
-            first_line = false;
-        }
-        let row = result?;
-        let fields = row.iter().collect::<Vec<&str>>();
-        let line = fields.join("\x1F");
-        write!(stream, "{}", line)?;
-    }
-    stream.flush()?;
-    Ok(())
 }
 
 pub fn add(left: usize, right: usize) -> usize {
