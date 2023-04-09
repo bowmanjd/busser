@@ -40,6 +40,10 @@ struct OutputCmd {
     /// infer SQL type
     #[argh(switch, short = 'i')]
     infer: bool,
+    
+    /// rows per page (0 for no paging)
+    #[argh(option, short = 'p', default = "0")]
+    pagesize: usize,
 }
 
 /// Show CSV columns
@@ -91,7 +95,7 @@ fn schema(args: SchemaCmd) -> Result<()> {
 fn output(args: OutputCmd) -> Result<()> {
     if let Some(jsonfile) = args.jsonfile {
         //busser::csv_into(&args.csvfile, &jsonfile, &args.table, args.infer, true, None)?;
-        busser::csv_into_json(&args.csvfile, &jsonfile, &args.table, 5000)?;
+        busser::csv_into_json(&args.csvfile, &jsonfile, &args.table, args.pagesize)?;
     }
     if let Some(bcpfile) = args.bcpfile {
         busser::csv_into_bcp(&args.csvfile, &bcpfile, &args.table, args.infer, 0)?;

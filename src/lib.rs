@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
 use csv::{Reader, ReaderBuilder};
+use std::ffi::OsString;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::iter::zip;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub mod infer;
 mod keywords;
@@ -95,9 +96,9 @@ fn field_processor_json(stream: &mut BufWriter<File>, column: &str, value: &str)
         new_value.push('"');
         for char in value.chars() {
             match char {
-                '\\' => new_value.push_str("\\\\"), 
-                '"' => new_value.push_str("\\\""), 
-                '\'' => new_value.push_str("''"), 
+                '\\' => new_value.push_str("\\\\"),
+                '"' => new_value.push_str("\\\""),
+                '\'' => new_value.push_str("''"),
                 _ => new_value.push(char),
             }
         }
@@ -192,6 +193,33 @@ pub fn csv_into_json(
     )
 }
 
+fn indexed_file_path(path: impl AsRef<Path>, index: usize) -> PathBuf {
+    let path = path.as_ref();
+    let mut newpath = path.to_owned();
+    let mut stem = OsString::new();
+
+    if let Some(s) = path.file_stem() {
+        stem.push(s);
+    } else {
+        stem.push("output");
+    }
+
+    stem.push("_");
+    stem.push(index.to_string());
+
+    newpath.set_file_name(stem);
+
+    if let Some(ext) = path.extension() {
+        newpath.set_extension(ext);
+    }
+    newpath
+}
+
+fn new_file(outpath: impl AsRef<Path>, index: usize) -> Result<BufWriter<File>> {
+    let outfile = File::create(indexed_file_path(outpath, index))?;
+    Ok(BufWriter::new(outfile))
+}
+
 fn csv_into(
     csvfile: &PathBuf,
     outpath: &PathBuf,
@@ -206,24 +234,36 @@ fn csv_into(
         &fn(&mut BufWriter<File>, &str, &Vec<String>, &Vec<infer::SQLType>) -> Result<()>,
     >,
 ) -> Result<()> {
+    let mut page: usize = 1;
     let columns = csv_columns(csvfile, Some(tablename), false)?;
     let mut rdr = csv_reader(csvfile)?;
-    let outfile = File::create(outpath)?;
-    let mut stream = BufWriter::new(outfile);
-    let row_length: usize = columns.len();
+    let mut stream = new_file(outpath, page)?;
     let mut sqltypes: Vec<infer::SQLType> = vec![
         infer::SQLType {
             name: "bit".to_string(),
             ..Default::default()
         };
-        row_length
+        columns.len()
     ];
+    let mut new_page = true;
 
     for (rounds, result) in rdr.records().enumerate() {
-        if rounds > 0 {
+        if page_size > 0 && rounds > 0 && (rounds % page_size) == 0 {
+            if let Some(page_footer) = page_footer {
+                page_footer(&mut stream, tablename, &columns, &sqltypes)?;
+            }
+            stream.flush()?;
+            page += 1;
+            stream = new_file(outpath, page)?;
+            new_page = true;
+        }
+        if new_page {
+            new_page = false;
+            if let Some(page_header) = page_header {
+                page_header(&mut stream, tablename, &columns)?;
+            }
+        } else {
             write!(stream, "{}", row_sep)?;
-        } else if let Some(page_header) = page_header {
-            page_header(&mut stream, tablename, &columns)?;
         }
         let row = result?;
         for (i, (column, value)) in zip(&columns, &row).enumerate() {
@@ -237,11 +277,6 @@ fn csv_into(
                 write!(stream, "{}", field_sep)?;
             }
             field_processor(&mut stream, &column, &value)?;
-        }
-        if let Some(page_footer) = page_footer {
-            if ((rounds + 1) % (page_size)) == 0 {
-                page_footer(&mut stream, tablename, &columns, &sqltypes)?;
-            }
         }
     }
     if let Some(page_footer) = page_footer {
