@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use csv::{Reader, ReaderBuilder};
 use std::ffi::OsString;
+use std::fs;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::iter::zip;
@@ -218,6 +219,28 @@ fn indexed_file_path(path: impl AsRef<Path>, index: usize) -> PathBuf {
 fn new_file(outpath: impl AsRef<Path>, index: usize) -> Result<BufWriter<File>> {
     let outfile = File::create(indexed_file_path(outpath, index))?;
     Ok(BufWriter::new(outfile))
+}
+
+pub fn determine_output_path(
+    path: Option<impl AsRef<Path>>,
+    tablename: &str,
+    extension: &str,
+) -> Result<PathBuf> {
+    let mut outfile = PathBuf::new();
+    if let Some(path) = path {
+        let path = path.as_ref();
+        outfile.push(&path);
+    } else {
+        outfile.push("out");
+    }
+    if outfile.extension().is_none() && !outfile.exists() {
+        fs::create_dir_all(outfile.clone())?;
+    }
+    if outfile.is_dir() {
+        outfile.set_file_name(tablename);
+        outfile.set_extension(extension);
+    }
+    Ok(outfile)
 }
 
 fn csv_into(
