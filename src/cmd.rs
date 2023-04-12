@@ -33,10 +33,6 @@ struct OutputCmd {
     #[argh(switch, short = 'j')]
     json: bool,
 
-    /// output for BCP
-    #[argh(switch, short = 'b')]
-    bcpfile: bool,
-
     /// SQL table name
     #[argh(option, short = 't')]
     table: String,

@@ -194,7 +194,10 @@ pub fn csv_into_json(
     )
 }
 
-fn indexed_file_path(path: impl AsRef<Path>, index: usize) -> PathBuf {
+fn indexed_file_path<T>(path: T, index: usize) -> PathBuf
+where
+    T: AsRef<Path>,
+{
     let path = path.as_ref();
     let mut newpath = path.to_owned();
     let mut stem = OsString::new();
