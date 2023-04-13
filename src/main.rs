@@ -3,7 +3,7 @@ mod cmd;
 
 fn main() {
     if let Err(err) = cmd::run(argh::from_env()) {
-        println!("{}", err);
+        eprintln!("{}", err);
         process::exit(1);
     }
 }
