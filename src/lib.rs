@@ -200,21 +200,23 @@ where
 {
     let path = path.as_ref();
     let mut newpath = path.to_owned();
-    let mut stem = OsString::new();
+    if index > 0 {
+        let mut stem = OsString::new();
 
-    if let Some(s) = path.file_stem() {
-        stem.push(s);
-    } else {
-        stem.push("output");
-    }
+        if let Some(s) = path.file_stem() {
+            stem.push(s);
+        } else {
+            stem.push("output");
+        }
 
-    stem.push("_");
-    stem.push(index.to_string());
+        stem.push("_");
+        stem.push(index.to_string());
 
-    newpath.set_file_name(stem);
+        newpath.set_file_name(stem);
 
-    if let Some(ext) = path.extension() {
-        newpath.set_extension(ext);
+        if let Some(ext) = path.extension() {
+            newpath.set_extension(ext);
+        }
     }
     newpath
 }
@@ -260,7 +262,7 @@ fn csv_into(
         &fn(&mut BufWriter<File>, &str, &Vec<String>, &Vec<infer::SQLType>) -> Result<()>,
     >,
 ) -> Result<()> {
-    let mut page: usize = 1;
+    let mut page: usize = 0;
     let columns = csv_columns(csvfile, Some(tablename), false)?;
     let mut rdr = csv_reader(csvfile)?;
     let mut stream = new_file(outpath, page)?;
@@ -272,6 +274,9 @@ fn csv_into(
         columns.len()
     ];
     let mut new_page = true;
+    if page_size > 0 {
+        page = 1;
+    }
 
     for (rounds, result) in rdr.records().enumerate() {
         if page_size > 0 && rounds > 0 && (rounds % page_size) == 0 {
