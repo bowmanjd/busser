@@ -97,12 +97,11 @@ fn schema(args: SchemaCmd) -> Result<()> {
 }
 
 fn output(args: OutputCmd) -> Result<()> {
-    let extension: String;
-    if args.json {
-        extension = "sql".to_string();
+    let extension: String = if args.json {
+        "sql".to_string()
     } else {
-        extension = "txt".to_string();
-    }
+        "txt".to_string()
+    };
     let outfile = busser::determine_output_path(args.output, &args.table, &extension)?;
     if args.json {
         busser::csv_into_json(&args.csvfile, &outfile, &args.table, args.pagesize)?;

@@ -86,5 +86,5 @@ fn test_output_infer_simple() {
     );
     let file_contents =
         fs::read_to_string(output_file.path()).expect("Should have been able to read the file");
-    assert!(file_contents.contains("abcd\x1F"));
+    insta::assert_debug_snapshot!(file_contents);
 }

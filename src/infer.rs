@@ -38,19 +38,17 @@ impl SQLType {
             self.size = other.size.max(self.size);
             self.index += 1;
             self.fixed = false;
-        } else {
-            if self.index == other.index {
-                self.subindex = other.subindex.max(self.subindex);
-                self.size = other.size.max(self.size);
-                self.scale = other.scale.max(self.scale);
-            } else if self.index < other.index {
-                self.name = other.name.clone();
-                self.index = other.index;
-                self.subindex = other.subindex;
-                self.fixed = other.fixed;
-                self.size = other.size;
-                self.scale = other.scale;
-            }
+        } else if self.index == other.index {
+            self.subindex = other.subindex.max(self.subindex);
+            self.size = other.size.max(self.size);
+            self.scale = other.scale.max(self.scale);
+        } else if self.index < other.index {
+            self.name = other.name.clone();
+            self.index = other.index;
+            self.subindex = other.subindex;
+            self.fixed = other.fixed;
+            self.size = other.size;
+            self.scale = other.scale;
         }
     }
 }
@@ -70,13 +68,13 @@ impl fmt::Display for SQLType {
 }
 
 pub fn infer(value: &str, index: usize, subindex: usize) -> Option<SQLType> {
-    if value == "" {
+    if value.is_empty() {
         return Some(SQLType {
             name: "bit".to_string(),
             ..Default::default()
         });
     }
-    let mut index = index.clone();
+    let mut index = index;
     while index < CHECKS.len() {
         if let Some(mut typesize) = CHECKS[index](value, subindex) {
             typesize.index = index;
@@ -149,10 +147,10 @@ fn check_bigint(value: &str, _subindex: usize) -> Option<SQLType> {
 }
 
 fn check_decimal(value: &str, _subindex: usize) -> Option<SQLType> {
-    let numeric = value.trim().replace(".", "");
+    let numeric = value.trim().replace('.', "");
     let length = numeric.len();
     if value.parse::<f64>().is_ok() && numeric.chars().all(char::is_numeric) && length <= 38 {
-        if let Some(point) = value.find(".") {
+        if let Some(point) = value.find('.') {
             Some(SQLType {
                 name: "numeric".to_string(),
                 size: length,
@@ -220,7 +218,7 @@ fn time_precision(nanoseconds: u32) -> usize {
 fn check_time(value: &str, subindex: usize) -> Option<SQLType> {
     for i in (subindex..formats::TIME_FORMATS.len()).chain(0..subindex) {
         let form = formats::TIME_FORMATS[i];
-        if let Ok(parsed) = NaiveTime::parse_from_str(&value, form) {
+        if let Ok(parsed) = NaiveTime::parse_from_str(value, form) {
             return Some(SQLType {
                 name: "time".to_string(),
                 subindex,
@@ -235,9 +233,9 @@ fn check_time(value: &str, subindex: usize) -> Option<SQLType> {
 fn check_datetimeoffset(value: &str, subindex: usize) -> Option<SQLType> {
     for i in (subindex..formats::DATETIMEOFFSET_FORMATS.len()).chain(0..subindex) {
         let form = formats::DATETIMEOFFSET_FORMATS[i];
-        if let Ok(parsed) = DateTime::parse_from_str(&value, &form).or(DateTime::parse_from_str(
+        if let Ok(parsed) = DateTime::parse_from_str(value, form).or(DateTime::parse_from_str(
             &format!("{}+00:00", &value),
-            &form,
+            form,
         )) {
             return Some(SQLType {
                 name: "datetimeoffset".to_string(),
@@ -253,7 +251,7 @@ fn check_datetimeoffset(value: &str, subindex: usize) -> Option<SQLType> {
 fn check_datetime(value: &str, subindex: usize) -> Option<SQLType> {
     for i in (subindex..formats::DATETIME_FORMATS.len()).chain(0..subindex) {
         let form = formats::DATETIME_FORMATS[i];
-        if let Ok(parsed) = NaiveDateTime::parse_from_str(&value, form) {
+        if let Ok(parsed) = NaiveDateTime::parse_from_str(value, form) {
             return Some(SQLType {
                 name: "datetime2".to_string(),
                 subindex,

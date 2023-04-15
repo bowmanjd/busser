@@ -10,7 +10,11 @@ use std::path::{Path, PathBuf};
 pub mod infer;
 mod keywords;
 
-fn csv_reader(csvfile: &PathBuf, delimiter: Option<u8>, terminator: Option<u8>) -> Result<Reader<File>> {
+fn csv_reader(
+    csvfile: &PathBuf,
+    delimiter: Option<u8>,
+    terminator: Option<u8>,
+) -> Result<Reader<File>> {
     let delimiter = delimiter.unwrap_or(b',');
     let sep: Terminator;
     if let Some(terminator) = terminator {
@@ -27,14 +31,19 @@ fn csv_reader(csvfile: &PathBuf, delimiter: Option<u8>, terminator: Option<u8>) 
 }
 
 // TODO: de-duplicate column names when needed
-pub fn csv_columns(csvfile: &PathBuf, tablename: Option<&str>, raw: bool, delimiter: Option<u8>, terminator: Option<u8>) -> Result<Vec<String>> {
-    let new_headers: Vec<String>;
+pub fn csv_columns(
+    csvfile: &PathBuf,
+    tablename: Option<&str>,
+    raw: bool,
+    delimiter: Option<u8>,
+    terminator: Option<u8>,
+) -> Result<Vec<String>> {
     let mut rdr = csv_reader(csvfile, delimiter, terminator)?;
     let headers = rdr.headers()?;
-    if raw {
-        new_headers = headers.iter().map(str::to_string).collect();
+    let new_headers: Vec<String> = if raw {
+        headers.iter().map(str::to_string).collect()
     } else {
-        new_headers = headers
+        headers
             .iter()
             .map(|h| {
                 let clean_chars: String = h
@@ -59,8 +68,8 @@ pub fn csv_columns(csvfile: &PathBuf, tablename: Option<&str>, raw: bool, delimi
                     clean_chars
                 }
             })
-            .collect();
-    }
+            .collect()
+    };
     Ok(new_headers)
 }
 
@@ -137,12 +146,12 @@ fn field_processor_json(stream: &mut BufWriter<File>, column: &str, value: &str)
 fn page_header_json(
     stream: &mut BufWriter<File>,
     tablename: &str,
-    columns: &Vec<String>,
+    columns: &[String],
 ) -> Result<()> {
     write!(stream, "INSERT INTO {}\nSELECT\n", tablename)?;
     for (i, col) in columns.iter().enumerate() {
         if i > 0 {
-            write!(stream, ",\n")?;
+            writeln!(stream, ",")?;
         }
         write!(stream, "    {}", col)?;
     }
@@ -153,7 +162,7 @@ fn page_header_json(
 fn page_footer_json(
     stream: &mut BufWriter<File>,
     _tablename: &str,
-    columns: &Vec<String>,
+    columns: &[String],
     sqltypes: &Vec<infer::SQLType>,
 ) -> Result<()> {
     let schema = schema_string(columns, sqltypes);
@@ -197,15 +206,10 @@ pub fn csv_into_json(
         ", ",
         &(field_processor_json as fn(&mut BufWriter<File>, &str, &str) -> Result<()>),
         page_size,
-        Some(&(page_header_json as fn(&mut BufWriter<File>, &str, &Vec<String>) -> Result<()>)),
+        Some(&(page_header_json as fn(&mut BufWriter<File>, &str, &[String]) -> Result<()>)),
         Some(
             &(page_footer_json
-                as fn(
-                    &mut BufWriter<File>,
-                    &str,
-                    &Vec<String>,
-                    &Vec<infer::SQLType>,
-                ) -> Result<()>),
+                as fn(&mut BufWriter<File>, &str, &[String], &Vec<infer::SQLType>) -> Result<()>),
         ),
     )
 }
@@ -250,7 +254,7 @@ pub fn determine_output_path(
     let mut outfile = PathBuf::new();
     if let Some(path) = path {
         let path = path.as_ref();
-        outfile.push(&path);
+        outfile.push(path);
     } else {
         outfile.push("out");
     }
@@ -273,9 +277,9 @@ fn csv_into(
     field_sep: &str,
     field_processor: &fn(&mut BufWriter<File>, &str, &str) -> Result<()>,
     page_size: usize,
-    page_header: Option<&fn(&mut BufWriter<File>, &str, &Vec<String>) -> Result<()>>,
+    page_header: Option<&fn(&mut BufWriter<File>, &str, &[String]) -> Result<()>>,
     page_footer: Option<
-        &fn(&mut BufWriter<File>, &str, &Vec<String>, &Vec<infer::SQLType>) -> Result<()>,
+        &fn(&mut BufWriter<File>, &str, &[String], &Vec<infer::SQLType>) -> Result<()>,
     >,
 ) -> Result<()> {
     let mut page: usize = 0;
@@ -323,7 +327,7 @@ fn csv_into(
             if i != 0 {
                 write!(stream, "{}", field_sep)?;
             }
-            field_processor(&mut stream, &column, &value)?;
+            field_processor(&mut stream, column, value)?;
         }
     }
     if let Some(page_footer) = page_footer {
@@ -338,7 +342,7 @@ fn csv_into(
     Ok(())
 }
 
-fn schema_string(columns: &Vec<String>, sqltypes: &Vec<infer::SQLType>) -> String {
+fn schema_string(columns: &[String], sqltypes: &Vec<infer::SQLType>) -> String {
     let mut schema = String::new();
     for (i, (column, sqlt)) in zip(columns, sqltypes).enumerate() {
         if i > 0 {
