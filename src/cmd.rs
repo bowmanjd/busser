@@ -75,19 +75,23 @@ struct SchemaCmd {
     #[argh(option, short = 't')]
     table: String,
 
+    #[argh(switch, short = 'a')]
+    /// use only varchars as type
+    asciidelimited: bool,
+
     #[argh(switch, short = 'c')]
     /// use only varchars as type
     chars: bool,
 }
 
 fn columns(args: ColumnsCmd) -> Result<()> {
-    let columns = busser::csv_columns(&args.csvfile, args.table.as_deref(), args.raw)?;
+    let columns = busser::csv_columns(&args.csvfile, args.table.as_deref(), args.raw, None, None)?;
     println!("{}", columns.join(", "));
     Ok(())
 }
 
 fn schema(args: SchemaCmd) -> Result<()> {
-    let create_table = busser::csv_schema(&args.csvfile, &args.table)?;
+    let create_table = busser::csv_schema(&args.csvfile, &args.table, args.asciidelimited)?;
     println!("{}", create_table);
     Ok(())
 }

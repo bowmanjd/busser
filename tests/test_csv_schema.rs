@@ -2,7 +2,7 @@ mod helper;
 
 #[test]
 fn test_schema_returns() {
-    let table = busser::csv_schema(&helper::get_test_file("test_all_1.csv"), "test")
+    let table = busser::csv_schema(&helper::get_test_file("test_all_1.csv"), "test", false)
         .unwrap();
     assert_eq!(
         table,

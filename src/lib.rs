@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use csv::{Reader, ReaderBuilder};
+use csv::{Reader, ReaderBuilder, Terminator};
 use std::ffi::OsString;
 use std::fs;
 use std::fs::File;
@@ -10,19 +10,26 @@ use std::path::{Path, PathBuf};
 pub mod infer;
 mod keywords;
 
-fn csv_reader(csvfile: &PathBuf) -> Result<Reader<File>> {
+fn csv_reader(csvfile: &PathBuf, delimiter: Option<u8>, terminator: Option<u8>) -> Result<Reader<File>> {
+    let delimiter = delimiter.unwrap_or(b',');
+    let sep: Terminator;
+    if let Some(terminator) = terminator {
+        sep = Terminator::Any(terminator);
+    } else {
+        sep = Terminator::CRLF;
+    }
     let rdr = ReaderBuilder::new()
+        .delimiter(delimiter)
+        .terminator(sep)
         .from_path(csvfile)
         .with_context(|| format!("Failed to read csv from {:?}", csvfile))?;
     Ok(rdr)
 }
 
 // TODO: de-duplicate column names when needed
-pub fn csv_columns(csvfile: &PathBuf, tablename: Option<&str>, raw: bool) -> Result<Vec<String>> {
+pub fn csv_columns(csvfile: &PathBuf, tablename: Option<&str>, raw: bool, delimiter: Option<u8>, terminator: Option<u8>) -> Result<Vec<String>> {
     let new_headers: Vec<String>;
-    let mut rdr = ReaderBuilder::new()
-        .from_path(csvfile)
-        .with_context(|| format!("Failed to read csv from {:?}", csvfile))?;
+    let mut rdr = csv_reader(csvfile, delimiter, terminator)?;
     let headers = rdr.headers()?;
     if raw {
         new_headers = headers.iter().map(str::to_string).collect();
@@ -57,9 +64,18 @@ pub fn csv_columns(csvfile: &PathBuf, tablename: Option<&str>, raw: bool) -> Res
     Ok(new_headers)
 }
 
-pub fn csv_schema(csvfile: &PathBuf, tablename: &str) -> Result<String> {
-    let headers = csv_columns(csvfile, Some(tablename), false)?;
-    let mut rdr = csv_reader(csvfile)?;
+pub fn csv_schema(csvfile: &PathBuf, tablename: &str, ascii_delimited: bool) -> Result<String> {
+    let delimiter: Option<u8>;
+    let terminator: Option<u8>;
+    if ascii_delimited {
+        delimiter = Some(b'\x1F');
+        terminator = Some(b'\x1E');
+    } else {
+        delimiter = None;
+        terminator = None;
+    }
+    let headers = csv_columns(csvfile, Some(tablename), false, delimiter, terminator)?;
+    let mut rdr = csv_reader(csvfile, delimiter, terminator)?;
     let row_length: usize = headers.len();
     let mut sqltypes: Vec<infer::SQLType> = vec![
         infer::SQLType {
@@ -263,8 +279,8 @@ fn csv_into(
     >,
 ) -> Result<()> {
     let mut page: usize = 0;
-    let columns = csv_columns(csvfile, Some(tablename), false)?;
-    let mut rdr = csv_reader(csvfile)?;
+    let columns = csv_columns(csvfile, Some(tablename), false, None, None)?;
+    let mut rdr = csv_reader(csvfile, None, None)?;
     let mut stream = new_file(outpath, page)?;
     let mut sqltypes: Vec<infer::SQLType> = vec![
         infer::SQLType {
@@ -343,7 +359,7 @@ mod tests {
 
     #[test]
     fn nonexistent_csv_file() {
-        let attempt = csv_reader(&PathBuf::from("No_Such_File.csv"));
+        let attempt = csv_reader(&PathBuf::from("No_Such_File.csv"), None, None);
         assert!(attempt.is_err());
     }
 }
