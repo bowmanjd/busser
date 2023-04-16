@@ -11,7 +11,7 @@ pub mod infer;
 mod keywords;
 
 type HeaderGen = fn(&mut BufWriter<File>, &str, &[String]) -> Result<()>;
-type FooterGen = fn(&mut BufWriter<File>, &str, &[String], &Vec<infer::SQLType>) -> Result<()>;
+type FooterGen = fn(&mut BufWriter<File>, &str, &[String], &[infer::SQLType]) -> Result<()>;
 type FieldProcessor = fn(&mut BufWriter<File>, &str, &str) -> Result<()>;
 
 struct OutputConfig {
@@ -166,7 +166,7 @@ fn page_footer_json(
     stream: &mut BufWriter<File>,
     _tablename: &str,
     columns: &[String],
-    sqltypes: &Vec<infer::SQLType>,
+    sqltypes: &[infer::SQLType],
 ) -> Result<()> {
     let schema = schema_string(columns, sqltypes);
     writeln!(stream, "}} \\\n]') WITH ({});", schema)?;
@@ -328,7 +328,7 @@ fn csv_into(
     Ok(())
 }
 
-fn schema_string(columns: &[String], sqltypes: &Vec<infer::SQLType>) -> String {
+fn schema_string(columns: &[String], sqltypes: &[infer::SQLType]) -> String {
     let mut schema = String::new();
     for (i, (column, sqlt)) in zip(columns, sqltypes).enumerate() {
         if i > 0 {
