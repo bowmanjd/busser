@@ -42,7 +42,6 @@ fn csv_reader(
     Ok(rdr)
 }
 
-// TODO: de-duplicate column names when needed
 pub fn csv_columns(
     csvfile: &PathBuf,
     tablename: Option<&str>,
@@ -52,7 +51,7 @@ pub fn csv_columns(
 ) -> Result<Vec<String>> {
     let mut rdr = csv_reader(csvfile, field_sep, row_sep)?;
     let headers = rdr.headers()?;
-    let new_headers: Vec<String> = if raw {
+    let mut new_headers: Vec<String> = if raw {
         headers.iter().map(str::to_string).collect()
     } else {
         headers
@@ -82,6 +81,27 @@ pub fn csv_columns(
             })
             .collect()
     };
+    // Rename duplicates to ensure unique column names
+    let mut counter: u16 = 2;
+    let mut indexes = (0..new_headers.len()).collect::<Vec<usize>>();
+    indexes.sort_unstable_by_key(|i| &new_headers[*i]);
+    let reference = new_headers.clone();
+    for i in 1..indexes.len() {
+        let current = indexes[i];
+        let previous = indexes[i - 1];
+        if new_headers[current] == reference[previous] {
+            while counter < u16::MAX {
+                let new_name = format!("{}_{}", new_headers[current], &counter);
+                if !new_headers.contains(&new_name) {
+                    new_headers[current] = new_name;
+                    break;
+                }
+                counter += 1;
+            }
+        } else {
+            counter = 2;
+        }
+    }
     Ok(new_headers)
 }
 
