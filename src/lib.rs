@@ -166,6 +166,21 @@ fn field_processor_json(stream: &mut BufWriter<File>, column: &str, value: &str)
     Ok(())
 }
 
+fn page_header_bcp(
+    stream: &mut BufWriter<File>,
+    _tablename: &str,
+    columns: &[String],
+) -> Result<()> {
+    for (i, col) in columns.iter().enumerate() {
+        if i > 0 {
+            write!(stream, "\x1F")?;
+        }
+        write!(stream, "{}", col)?;
+    }
+    write!(stream, "\x1E")?;
+    Ok(())
+}
+
 fn page_header_json(
     stream: &mut BufWriter<File>,
     tablename: &str,
@@ -204,7 +219,7 @@ pub fn csv_into_bcp(
         row_sep: String::from('\x1E'),
         field_sep: String::from('\x1F'),
         field_processor: field_processor_bcp,
-        page_header: None,
+        page_header: Some(page_header_bcp),
         page_footer: None,
     };
     csv_into(csvfile, filename, tablename, infer, page_size, conf)
