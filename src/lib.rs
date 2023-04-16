@@ -10,20 +10,32 @@ use std::path::{Path, PathBuf};
 pub mod infer;
 mod keywords;
 
+type HeaderGen = fn(&mut BufWriter<File>, &str, &[String]) -> Result<()>;
+type FooterGen = fn(&mut BufWriter<File>, &str, &[String], &Vec<infer::SQLType>) -> Result<()>;
+type FieldProcessor = fn(&mut BufWriter<File>, &str, &str) -> Result<()>;
+
+struct OutputConfig {
+    row_sep: String,
+    field_sep: String,
+    field_processor: FieldProcessor,
+    page_header: Option<HeaderGen>,
+    page_footer: Option<FooterGen>,
+}
+
 fn csv_reader(
     csvfile: &PathBuf,
-    delimiter: Option<u8>,
-    terminator: Option<u8>,
+    field_sep: Option<u8>,
+    row_sep: Option<u8>,
 ) -> Result<Reader<File>> {
-    let delimiter = delimiter.unwrap_or(b',');
+    let field_sep = field_sep.unwrap_or(b',');
     let sep: Terminator;
-    if let Some(terminator) = terminator {
-        sep = Terminator::Any(terminator);
+    if let Some(row_sep) = row_sep {
+        sep = Terminator::Any(row_sep);
     } else {
         sep = Terminator::CRLF;
     }
     let rdr = ReaderBuilder::new()
-        .delimiter(delimiter)
+        .delimiter(field_sep)
         .terminator(sep)
         .from_path(csvfile)
         .with_context(|| format!("Failed to read csv from {:?}", csvfile))?;
@@ -35,10 +47,10 @@ pub fn csv_columns(
     csvfile: &PathBuf,
     tablename: Option<&str>,
     raw: bool,
-    delimiter: Option<u8>,
-    terminator: Option<u8>,
+    field_sep: Option<u8>,
+    row_sep: Option<u8>,
 ) -> Result<Vec<String>> {
-    let mut rdr = csv_reader(csvfile, delimiter, terminator)?;
+    let mut rdr = csv_reader(csvfile, field_sep, row_sep)?;
     let headers = rdr.headers()?;
     let new_headers: Vec<String> = if raw {
         headers.iter().map(str::to_string).collect()
@@ -74,17 +86,17 @@ pub fn csv_columns(
 }
 
 pub fn csv_schema(csvfile: &PathBuf, tablename: &str, ascii_delimited: bool) -> Result<String> {
-    let delimiter: Option<u8>;
-    let terminator: Option<u8>;
+    let field_sep: Option<u8>;
+    let row_sep: Option<u8>;
     if ascii_delimited {
-        delimiter = Some(b'\x1F');
-        terminator = Some(b'\x1E');
+        field_sep = Some(b'\x1F');
+        row_sep = Some(b'\x1E');
     } else {
-        delimiter = None;
-        terminator = None;
+        field_sep = None;
+        row_sep = None;
     }
-    let headers = csv_columns(csvfile, Some(tablename), false, delimiter, terminator)?;
-    let mut rdr = csv_reader(csvfile, delimiter, terminator)?;
+    let headers = csv_columns(csvfile, Some(tablename), false, field_sep, row_sep)?;
+    let mut rdr = csv_reader(csvfile, field_sep, row_sep)?;
     let row_length: usize = headers.len();
     let mut sqltypes: Vec<infer::SQLType> = vec![
         infer::SQLType {
@@ -128,18 +140,9 @@ fn field_processor_json(stream: &mut BufWriter<File>, column: &str, value: &str)
                 _ => new_value.push(char),
             }
         }
-
-        /*
-        new_value.push_str(
-            &value
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("'", "''"),
-        );
-        */
         new_value.push('"');
     }
-    write!(stream, "\"{}\": {}", column, new_value)?;
+    write!(stream, "\"{}\": {}", column, &new_value)?;
     Ok(())
 }
 
@@ -177,18 +180,14 @@ pub fn csv_into_bcp(
     infer: bool,
     page_size: usize,
 ) -> Result<()> {
-    csv_into(
-        csvfile,
-        filename,
-        tablename,
-        infer,
-        "\x1E",
-        "\x1F",
-        &(field_processor_bcp as fn(&mut BufWriter<File>, &str, &str) -> Result<()>),
-        page_size,
-        None,
-        None,
-    )
+    let conf = OutputConfig {
+        row_sep: String::from('\x1E'),
+        field_sep: String::from('\x1F'),
+        field_processor: field_processor_bcp,
+        page_header: None,
+        page_footer: None,
+    };
+    csv_into(csvfile, filename, tablename, infer, page_size, conf)
 }
 
 pub fn csv_into_json(
@@ -197,21 +196,14 @@ pub fn csv_into_json(
     tablename: &str,
     page_size: usize,
 ) -> Result<()> {
-    csv_into(
-        csvfile,
-        filename,
-        tablename,
-        true,
-        "}, \\\n    {",
-        ", ",
-        &(field_processor_json as fn(&mut BufWriter<File>, &str, &str) -> Result<()>),
-        page_size,
-        Some(&(page_header_json as fn(&mut BufWriter<File>, &str, &[String]) -> Result<()>)),
-        Some(
-            &(page_footer_json
-                as fn(&mut BufWriter<File>, &str, &[String], &Vec<infer::SQLType>) -> Result<()>),
-        ),
-    )
+    let conf = OutputConfig {
+        row_sep: String::from("}, \\\n    {"),
+        field_sep: String::from(", "),
+        field_processor: field_processor_json,
+        page_header: Some(page_header_json),
+        page_footer: Some(page_footer_json),
+    };
+    csv_into(csvfile, filename, tablename, true, page_size, conf)
 }
 
 fn indexed_file_path<T>(path: T, index: usize) -> PathBuf
@@ -273,14 +265,8 @@ fn csv_into(
     outpath: &PathBuf,
     tablename: &str,
     infer: bool,
-    row_sep: &str,
-    field_sep: &str,
-    field_processor: &fn(&mut BufWriter<File>, &str, &str) -> Result<()>,
     page_size: usize,
-    page_header: Option<&fn(&mut BufWriter<File>, &str, &[String]) -> Result<()>>,
-    page_footer: Option<
-        &fn(&mut BufWriter<File>, &str, &[String], &Vec<infer::SQLType>) -> Result<()>,
-    >,
+    config: OutputConfig,
 ) -> Result<()> {
     let mut page: usize = 0;
     let columns = csv_columns(csvfile, Some(tablename), false, None, None)?;
@@ -300,7 +286,7 @@ fn csv_into(
 
     for (rounds, result) in rdr.records().enumerate() {
         if page_size > 0 && rounds > 0 && (rounds % page_size) == 0 {
-            if let Some(page_footer) = page_footer {
+            if let Some(page_footer) = config.page_footer {
                 page_footer(&mut stream, tablename, &columns, &sqltypes)?;
             }
             stream.flush()?;
@@ -310,11 +296,11 @@ fn csv_into(
         }
         if new_page {
             new_page = false;
-            if let Some(page_header) = page_header {
+            if let Some(page_header) = config.page_header {
                 page_header(&mut stream, tablename, &columns)?;
             }
         } else {
-            write!(stream, "{}", row_sep)?;
+            write!(stream, "{}", config.row_sep)?;
         }
         let row = result?;
         for (i, (column, value)) in zip(&columns, &row).enumerate() {
@@ -325,12 +311,12 @@ fn csv_into(
                 }
             }
             if i != 0 {
-                write!(stream, "{}", field_sep)?;
+                write!(stream, "{}", config.field_sep)?;
             }
-            field_processor(&mut stream, column, value)?;
+            (config.field_processor)(&mut stream, column, value)?;
         }
     }
-    if let Some(page_footer) = page_footer {
+    if let Some(page_footer) = config.page_footer {
         page_footer(&mut stream, tablename, &columns, &sqltypes)?;
     }
     stream.flush()?;
