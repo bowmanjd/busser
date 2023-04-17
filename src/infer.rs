@@ -216,6 +216,10 @@ fn time_precision(nanoseconds: u32) -> usize {
 }
 
 fn check_time(value: &str, subindex: usize) -> Option<SQLType> {
+    // Fail if straight integer
+    if value.parse::<u8>().is_ok() {
+        return None;
+    }
     for i in (subindex..formats::TIME_FORMATS.len()).chain(0..subindex) {
         let form = formats::TIME_FORMATS[i];
         if let Ok(parsed) = NaiveTime::parse_from_str(value, form) {
