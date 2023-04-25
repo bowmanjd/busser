@@ -13,28 +13,6 @@ pub fn range_from_string(range_str: &str) -> Result<Vec<Vec<usize>>> {
         .collect::<Vec<_>>())
 }
 
-trait Displayable {
-    fn display(&self) -> &str;
-}
-
-impl Displayable for str {
-    fn display(&self) -> &str {
-        self
-    }
-}
-
-impl Displayable for &str {
-    fn display(&self) -> &str {
-        *self
-    }
-}
-
-impl Displayable for String {
-    fn display(&self) -> &str {
-        self.as_str()
-    }
-}
-
 fn borders<T>(
     values: Option<&T>,
     lengths: &[usize],
@@ -44,7 +22,7 @@ fn borders<T>(
     pad: Option<char>,
 ) where
     T: std::ops::Index<usize>,
-    T::Output: Displayable,
+    T::Output: AsRef<str>,
 {
     let pad = pad.unwrap_or(' ');
     print!("{}{}", left, pad);
@@ -53,7 +31,7 @@ fn borders<T>(
             print!("{0}{1}{0}", pad, inner);
         }
         if let Some(values) = values {
-            print!("{:width$}", values[i].display(), width = length);
+            print!("{:width$}", values[i].as_ref(), width = length);
         } else {
             print!("{}", pad.to_string().repeat(*length));
         };
