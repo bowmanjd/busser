@@ -74,8 +74,10 @@ pub fn view(
     let stats = crate::csv_survey(csvfile, false, None, field_sep, row_sep)?;
     let mut rdr = crate::csv_reader(csvfile, field_sep, row_sep)?;
 
-    borders::<Vec<&str>>(
-        None,
+    let nothing: Option<&Vec<&str>> = None;
+
+    borders(
+        nothing,
         &stats.column_char_lengths,
         '\u{250C}',
         '\u{252c}',
@@ -92,8 +94,8 @@ pub fn view(
         None,
     );
 
-    borders::<Vec<&str>>(
-        None,
+    borders(
+        nothing,
         &stats.column_char_lengths,
         '\u{251C}',
         '\u{253C}',
@@ -101,20 +103,30 @@ pub fn view(
         Some('\u{2500}'),
     );
 
-    for result in rdr.records() {
-        let row = result?;
-        borders(
-            Some(&row),
-            &stats.column_char_lengths,
-            '\u{2502}',
-            '\u{2502}',
-            '\u{2502}',
-            None,
-        );
+    let mut last_row: usize = 0;
+
+    for range in row_range {
+        let skip = range[0].saturating_sub(1).saturating_sub(last_row);
+        last_row = range[range.len() - 1];
+        if last_row == 0 {
+            last_row = stats.row_count;
+        }
+        let rows = last_row - skip;
+        for result in rdr.records().skip(skip).take(rows) {
+            let row = result?;
+            borders(
+                Some(&row),
+                &stats.column_char_lengths,
+                '\u{2502}',
+                '\u{2502}',
+                '\u{2502}',
+                None,
+            );
+        }
     }
 
-    borders::<Vec<&str>>(
-        None,
+    borders(
+        nothing,
         &stats.column_char_lengths,
         '\u{2514}',
         '\u{2534}',
