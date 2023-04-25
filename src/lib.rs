@@ -9,14 +9,15 @@ use std::path::{Path, PathBuf};
 
 pub mod infer;
 mod keywords;
+pub mod view;
 
 type HeaderGen = fn(&mut BufWriter<File>, &str, &[String]) -> Result<()>;
 type FooterGen = fn(&mut BufWriter<File>, &str, &[String], &[infer::SQLType]) -> Result<()>;
 type FieldProcessor = fn(&mut BufWriter<File>, &str, &str) -> Result<()>;
 
 struct OutputConfig {
-    row_sep: String,
-    field_sep: String,
+    row_sep: Vec<u8>,
+    field_sep: Vec<u8>,
     field_processor: FieldProcessor,
     page_header: Option<HeaderGen>,
     page_footer: Option<FooterGen>,
@@ -105,6 +106,62 @@ pub fn csv_columns(
     Ok(new_headers)
 }
 
+#[derive(Debug, Default)]
+pub struct CsvStats {
+    column_count: usize,
+    row_count: usize,
+    columns: Vec<String>,
+    raw_columns: Vec<String>,
+    column_char_lengths: Vec<usize>,
+    column_byte_lengths: Vec<usize>,
+    column_types: Option<Vec<infer::SQLType>>,
+}
+
+pub fn csv_survey(
+    csvfile: &PathBuf,
+    infer: bool,
+    tablename: Option<&str>,
+    field_sep: Option<u8>,
+    row_sep: Option<u8>,
+) -> Result<CsvStats> {
+    let mut stats = CsvStats {
+        ..Default::default()
+    };
+    stats.columns = csv_columns(csvfile, tablename, false, field_sep, row_sep)?;
+    stats.raw_columns = csv_columns(csvfile, tablename, true, field_sep, row_sep)?;
+    stats.column_count = stats.columns.len();
+    stats.column_char_lengths = stats.columns.iter().map(|x| x.chars().count()).collect(); 
+    stats.column_byte_lengths = stats.columns.iter().map(|x| x.len()).collect(); 
+
+    let mut rdr = csv_reader(csvfile, field_sep, row_sep)?;
+    if infer {
+        stats.column_types = Some(vec![
+            infer::SQLType {
+                name: "bit".to_string(),
+                ..Default::default()
+            };
+            stats.column_count
+        ]);
+    }
+
+    for result in rdr.records() {
+        stats.row_count += 1;
+        let row = result?;
+        for (i, value) in row.iter().enumerate() {
+            stats.column_char_lengths[i] = stats.column_char_lengths[i].max(value.chars().count());
+            stats.column_byte_lengths[i] = stats.column_byte_lengths[i].max(value.len());
+            if infer {
+                let Some(ref mut sqltypes) = stats.column_types else { todo!() };
+                if let Some(sqltype) = infer::infer(value, sqltypes[i].index, sqltypes[i].subindex)
+                {
+                    sqltypes[i].merge(&sqltype);
+                }
+            }
+        }
+    }
+    Ok(stats)
+}
+
 pub fn csv_schema(csvfile: &PathBuf, tablename: &str, ascii_delimited: bool) -> Result<String> {
     let field_sep: Option<u8>;
     let row_sep: Option<u8>;
@@ -142,7 +199,7 @@ pub fn csv_schema(csvfile: &PathBuf, tablename: &str, ascii_delimited: bool) -> 
 }
 
 fn field_processor_bcp(stream: &mut BufWriter<File>, _column: &str, value: &str) -> Result<()> {
-    write!(stream, "{}", value)?;
+    stream.write_all(value.as_bytes())?;
     Ok(())
 }
 
@@ -216,8 +273,8 @@ pub fn csv_into_bcp(
     page_size: usize,
 ) -> Result<()> {
     let conf = OutputConfig {
-        row_sep: String::from('\x1E'),
-        field_sep: String::from('\x1F'),
+        row_sep: b"\x1E".to_vec(),
+        field_sep: b"\x1F".to_vec(),
         field_processor: field_processor_bcp,
         page_header: Some(page_header_bcp),
         page_footer: None,
@@ -232,8 +289,8 @@ pub fn csv_into_json(
     page_size: usize,
 ) -> Result<()> {
     let conf = OutputConfig {
-        row_sep: String::from("}, \\\n    {"),
-        field_sep: String::from(", "),
+        row_sep: b"}, \\\n    {".to_vec(),
+        field_sep: b", ".to_vec(),
         field_processor: field_processor_json,
         page_header: Some(page_header_json),
         page_footer: Some(page_footer_json),
@@ -335,7 +392,7 @@ fn csv_into(
                 page_header(&mut stream, tablename, &columns)?;
             }
         } else {
-            write!(stream, "{}", config.row_sep)?;
+            stream.write_all(&config.row_sep)?;
         }
         let row = result?;
         for (i, (column, value)) in zip(&columns, &row).enumerate() {
@@ -346,7 +403,7 @@ fn csv_into(
                 }
             }
             if i != 0 {
-                write!(stream, "{}", config.field_sep)?;
+                stream.write_all(&config.field_sep)?;
             }
             (config.field_processor)(&mut stream, column, value)?;
         }

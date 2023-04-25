@@ -15,6 +15,7 @@ enum Subcommands {
     Output(OutputCmd),
     Columns(ColumnsCmd),
     Schema(SchemaCmd),
+    View(ViewCmd),
 }
 
 /// Output special formats from CSV input
@@ -63,6 +64,27 @@ struct ColumnsCmd {
     raw: bool,
 }
 
+/// View CSV file
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "view")]
+struct ViewCmd {
+    /// CSV file path
+    #[argh(positional)]
+    csvfile: PathBuf,
+
+    #[argh(switch, short = 'a')]
+    /// use only varchars as type
+    asciidelimited: bool,
+
+    #[argh(option, short = 'r')]
+    /// show only row or range of rows
+    rows: Option<String>,
+
+    #[argh(option, short = 'c')]
+    /// show only row or range of rows
+    columns: Option<String>,
+}
+
 /// Get suggested SQL table schema
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "schema")]
@@ -82,6 +104,28 @@ struct SchemaCmd {
     #[argh(switch, short = 'c')]
     /// use only varchars as type
     chars: bool,
+}
+
+fn view(args: ViewCmd) -> Result<()> {
+    /*
+    let stats = busser::csv_survey(
+        &args.csvfile,
+        false,
+        None,
+        None,
+        None,
+        )?;
+    println!("{:?}", stats);
+    */
+    busser::view::view(
+        &args.csvfile,
+        args.rows.as_deref(),
+        args.columns.as_deref(),
+        None,
+        None,
+        args.asciidelimited,
+    )?;
+    Ok(())
 }
 
 fn columns(args: ColumnsCmd) -> Result<()> {
@@ -122,6 +166,7 @@ pub fn run(args: Args) -> Result<()> {
         Subcommands::Columns(args) => columns(args)?,
         Subcommands::Output(args) => output(args)?,
         Subcommands::Schema(args) => schema(args)?,
+        Subcommands::View(args) => view(args)?,
     }
 
     Ok(())
