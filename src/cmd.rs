@@ -76,6 +76,10 @@ struct ViewCmd {
     /// use only varchars as type
     asciidelimited: bool,
 
+    #[argh(switch, short = 'n')]
+    /// use only varchars as type
+    numbered: bool,
+
     #[argh(option, short = 'r')]
     /// show only row or range of rows
     rows: Option<String>,
@@ -124,6 +128,7 @@ fn view(args: ViewCmd) -> Result<()> {
         None,
         None,
         args.asciidelimited,
+        args.numbered,
     )?;
     Ok(())
 }

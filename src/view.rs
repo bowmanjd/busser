@@ -46,6 +46,7 @@ pub fn view(
     field_sep: Option<u8>,
     row_sep: Option<u8>,
     ascii_delimited: bool,
+    numbered: bool,
 ) -> Result<()> {
     let field_sep = if ascii_delimited && field_sep.is_none() {
         Some(b'\x1F')
@@ -71,8 +72,21 @@ pub fn view(
     };
     println!("row_range: {:?}\ncol_range: {:?}", row_range, col_range);
 
-    let stats = crate::csv_survey(csvfile, false, None, field_sep, row_sep)?;
+    let mut stats = crate::csv_survey(csvfile, false, None, field_sep, row_sep)?;
     let mut rdr = crate::csv_reader(csvfile, field_sep, row_sep)?;
+
+    //let mut column_lengths = &mut stats.column_char_lengths;
+
+    if numbered {
+        let row_num_length = stats.row_count.to_string().len(); 
+        //let col_num_length = stats.column_count.to_string().len();
+        for i in 0..stats.column_count {
+            stats.raw_columns[i] = format!("{}: {}", i + 1, stats.raw_columns[i]);
+            stats.column_char_lengths[i] = stats.column_char_lengths[i].max(stats.raw_columns[i].len());
+        }
+        stats.column_char_lengths.insert(0, row_num_length);
+        stats.raw_columns.insert(0, "#".to_string());
+    }
 
     let nothing: Option<&Vec<&str>> = None;
 
@@ -106,14 +120,23 @@ pub fn view(
     let mut last_row: usize = 0;
 
     for range in row_range {
-        let skip = range[0].saturating_sub(1).saturating_sub(last_row);
+        let first_row = if range[0] == 0 {
+            1
+        } else {
+            range[0]
+        };
+        //let skip = first_row + last_row;
+        let skip = range[0].saturating_sub(1 + last_row);
         last_row = range[range.len() - 1];
         if last_row == 0 {
             last_row = stats.row_count;
         }
         let rows = last_row - skip;
-        for result in rdr.records().skip(skip).take(rows) {
-            let row = result?;
+        for (i, result) in rdr.records().skip(skip).take(rows).enumerate() {
+            let mut row: Vec<String> = result?.iter().map(str::to_owned).collect();
+            if numbered {
+                row.insert(0, (i + first_row).to_string());
+            }
             borders(
                 Some(&row),
                 &stats.column_char_lengths,
