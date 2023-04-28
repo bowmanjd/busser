@@ -1,4 +1,4 @@
-<svg viewBox="0 0 300 12" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1">
+<svg viewBox="0 0 300 12" width="300" height="16" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1">
  <title>DROP TABLE IF EXISTS Deparmental_Silos</title>
  <style>text{fill:#333;font-family:monospace;font-size:1.5vw}@media(prefers-color-scheme:dark){text{fill: #ccc}}</style>
  <path id="path">
