@@ -23,21 +23,55 @@ struct OutputConfig {
     page_footer: Option<FooterGen>,
 }
 
+/*
+struct OutputConfig<F>
+where
+    F: Fn(&mut BufWriter<File>, &str, &str) -> Result<()>,
+{
+    row_sep: Vec<u8>,
+    field_sep: Vec<u8>,
+    field_processor: F,
+    page_header: Option<HeaderGen>,
+    page_footer: Option<FooterGen>,
+}
+
+impl<F> OutputConfig<F>
+where
+    F: Fn(&mut BufWriter<File>, &str, &str) -> Result<()>,
+{
+    fn new(
+        row_sep: Vec<u8>,
+        field_sep: Vec<u8>,
+        field_processor: F,
+        page_header: Option<HeaderGen>,
+        page_footer: Option<FooterGen>,
+    ) -> Self {
+        Self {
+            row_sep,
+            field_sep,
+            field_processor,
+            page_header,
+            page_footer,
+        }
+    }
+}
+*/
+
 fn csv_reader(
     csvfile: &PathBuf,
     field_sep: Option<u8>,
     row_sep: Option<u8>,
 ) -> Result<Reader<File>> {
     let field_sep = field_sep.unwrap_or(b',');
-    let sep: Terminator;
-    if let Some(row_sep) = row_sep {
-        sep = Terminator::Any(row_sep);
+    let sep = if let Some(row_sep) = row_sep {
+        Terminator::Any(row_sep)
     } else {
-        sep = Terminator::CRLF;
-    }
+        Terminator::CRLF
+    };
     let rdr = ReaderBuilder::new()
         .delimiter(field_sep)
         .terminator(sep)
+        .buffer_capacity(16384)
         .from_path(csvfile)
         .with_context(|| format!("Failed to read csv from {:?}", csvfile))?;
     Ok(rdr)
@@ -130,8 +164,8 @@ pub fn csv_survey(
     stats.columns = csv_columns(csvfile, tablename, false, field_sep, row_sep)?;
     stats.raw_columns = csv_columns(csvfile, tablename, true, field_sep, row_sep)?;
     stats.column_count = stats.columns.len();
-    stats.column_char_lengths = stats.columns.iter().map(|x| x.chars().count()).collect(); 
-    stats.column_byte_lengths = stats.columns.iter().map(|x| x.len()).collect(); 
+    stats.column_char_lengths = stats.columns.iter().map(|x| x.chars().count()).collect();
+    stats.column_byte_lengths = stats.columns.iter().map(|x| x.len()).collect();
 
     let mut rdr = csv_reader(csvfile, field_sep, row_sep)?;
     if infer {
@@ -199,7 +233,7 @@ pub fn csv_schema(csvfile: &PathBuf, tablename: &str, ascii_delimited: bool) -> 
 }
 
 fn field_processor_bcp(stream: &mut BufWriter<File>, _column: &str, value: &str) -> Result<()> {
-    stream.write_all(value.as_bytes())?;
+    stream.write_all(value.as_ref())?;
     Ok(())
 }
 
@@ -282,6 +316,56 @@ pub fn csv_into_bcp(
     csv_into(csvfile, filename, tablename, infer, page_size, conf)
 }
 
+pub fn csv_into_bcp_fast(
+    csvfile: &PathBuf,
+    filename: &PathBuf,
+    _tablename: &str,
+    _infer: bool,
+    _page_size: usize,
+) -> Result<()> {
+    let mut rdr = ReaderBuilder::new()
+        .has_headers(false)
+        .buffer_capacity(16384)
+        .from_path(csvfile)
+        .with_context(|| format!("Failed to read csv from {:?}", csvfile))?;
+    let mut stream = new_file(filename, 0)?;
+    let mut new_page = true;
+    let row_sep = b"\x1E".to_vec();
+    let field_sep = b"\x1F".to_vec();
+
+    /*
+    let mut wtr = WriterBuilder::new()
+        .delimiter(b'\x1F')
+        .terminator(Terminator::Any(b'\x1E'))
+        .buffer_capacity(65536)
+        .from_path(filename)
+        .with_context(|| format!("Failed to write csv to {:?}", filename))?;
+
+    let mut r = csv::ByteRecord::new();
+    while rdr.read_byte_record(&mut r)? {
+        wtr.write_byte_record(&r)?;
+    }
+    */
+    for result in rdr.byte_records() {
+        //let row = result?;
+        if new_page {
+            new_page = false;
+        } else {
+            stream.write_all(&row_sep)?;
+        }
+        let mut first = true;
+        for value in &result? {
+            if first {
+                first = false;
+            } else {
+                stream.write_all(&field_sep)?;
+            }
+            stream.write_all(value)?;
+        }
+    }
+    Ok(())
+}
+
 pub fn csv_into_json(
     csvfile: &PathBuf,
     filename: &PathBuf,
@@ -327,7 +411,7 @@ where
 
 fn new_file(outpath: impl AsRef<Path>, index: usize) -> Result<BufWriter<File>> {
     let outfile = File::create(indexed_file_path(outpath, index))?;
-    Ok(BufWriter::new(outfile))
+    Ok(BufWriter::with_capacity(65536, outfile))
 }
 
 pub fn determine_output_path(

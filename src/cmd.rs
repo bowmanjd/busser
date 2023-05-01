@@ -155,7 +155,7 @@ fn output(args: OutputCmd) -> Result<()> {
     if args.json {
         busser::csv_into_json(&args.csvfile, &outfile, &args.table, args.pagesize)?;
     } else {
-        busser::csv_into_bcp(
+        busser::csv_into_bcp_fast(
             &args.csvfile,
             &outfile,
             &args.table,
