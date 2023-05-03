@@ -149,7 +149,7 @@ fn check_bigint(value: &str, _subindex: usize) -> Option<SQLType> {
 fn check_decimal(value: &str, _subindex: usize) -> Option<SQLType> {
     let numeric = value.trim().replace('.', "");
     let length = numeric.len();
-    if value.parse::<f64>().is_ok() && numeric.chars().all(char::is_numeric) && length <= 38 {
+    if value.parse::<f64>().is_ok() && numeric.chars().all(|c| match c {'-' | '.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => true, _ => false,}) && length <= 38 {
         if let Some(point) = value.find('.') {
             Some(SQLType {
                 name: "numeric".to_string(),
