@@ -1,4 +1,9 @@
 use std::process;
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
+
 mod cmd;
 
 fn main() {

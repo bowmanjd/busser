@@ -6,12 +6,6 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::iter::zip;
 use std::path::{Path, PathBuf};
-/*
-use mimalloc::MiMalloc;
-
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
-*/
 
 pub mod infer;
 mod keywords;
