@@ -56,8 +56,9 @@ impl SQLType {
 impl fmt::Display for SQLType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut name = self.name.clone();
+        let size = self.size + self.scale;
         if self.size > 0 || self.name.contains("time") {
-            name.push_str(&format!("({}", self.size));
+            name.push_str(&format!("({}", size));
             if self.scale > 0 {
                 name.push_str(&format!(", {}", self.scale));
             }
@@ -147,14 +148,23 @@ fn check_bigint(value: &str, _subindex: usize) -> Option<SQLType> {
 }
 
 fn check_decimal(value: &str, _subindex: usize) -> Option<SQLType> {
-    let numeric = value.trim().replace('.', "");
-    let length = numeric.len();
-    if value.parse::<f64>().is_ok() && numeric.chars().all(|c| match c {'-' | '.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => true, _ => false,}) && length <= 38 {
+    let length = value.chars().filter(|c| c.is_numeric()).count();
+    if value.parse::<f64>().is_ok()
+        && value.trim().chars().all(|c| match c {
+            '-' | '.' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => true,
+            _ => false,
+        })
+        && length <= 38
+    {
         if let Some(point) = value.find('.') {
+            let scale = value[point + 1..]
+                .chars()
+                .filter(|c| c.is_numeric())
+                .count();
             Some(SQLType {
                 name: "numeric".to_string(),
-                size: length,
-                scale: value.trim()[point + 1..].len(),
+                size: length - scale,
+                scale: scale,
                 ..Default::default()
             })
         } else {
@@ -237,10 +247,9 @@ fn check_time(value: &str, subindex: usize) -> Option<SQLType> {
 fn check_datetimeoffset(value: &str, subindex: usize) -> Option<SQLType> {
     for i in (subindex..formats::DATETIMEOFFSET_FORMATS.len()).chain(0..subindex) {
         let form = formats::DATETIMEOFFSET_FORMATS[i];
-        if let Ok(parsed) = DateTime::parse_from_str(value, form).or(DateTime::parse_from_str(
-            &format!("{}+00:00", &value),
-            form,
-        )) {
+        if let Ok(parsed) = DateTime::parse_from_str(value, form)
+            .or(DateTime::parse_from_str(&format!("{}+00:00", &value), form))
+        {
             return Some(SQLType {
                 name: "datetimeoffset".to_string(),
                 subindex,
