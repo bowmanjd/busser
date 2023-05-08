@@ -171,7 +171,6 @@ pub fn csv_survey(
     if infer {
         stats.column_types = Some(vec![
             infer::SQLType {
-                name: "bit".to_string(),
                 ..Default::default()
             };
             stats.column_count
@@ -211,7 +210,6 @@ pub fn csv_schema(csvfile: &PathBuf, tablename: &str, ascii_delimited: bool) -> 
     let row_length: usize = headers.len();
     let mut sqltypes: Vec<infer::SQLType> = vec![
         infer::SQLType {
-            name: "bit".to_string(),
             ..Default::default()
         };
         row_length
@@ -450,7 +448,6 @@ fn csv_into(
     let mut stream = new_file(outpath, page)?;
     let mut sqltypes: Vec<infer::SQLType> = vec![
         infer::SQLType {
-            name: "bit".to_string(),
             ..Default::default()
         };
         columns.len()
