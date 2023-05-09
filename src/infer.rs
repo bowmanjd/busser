@@ -49,17 +49,15 @@ pub struct SQLType {
     pub index: usize,
     pub subindex: usize,
     pub scale: usize,
-    pub fixed: bool,
 }
 
 impl SQLType {
     pub fn merge(&mut self, other: &Self) {
-        if other.fixed && self.fixed && other.size != self.size {
+        if self.name == other.name && other.name == SQLTypeName::Char && other.size != self.size {
             self.name = SQLTypeName::Varchar;
             self.size = other.size.max(self.size);
             self.index += 1;
-            self.fixed = false;
-        } else if self.index == other.index {
+        } else if self.name == other.name {
             self.subindex = other.subindex.max(self.subindex);
             self.size = other.size.max(self.size);
             self.scale = other.scale.max(self.scale);
@@ -67,7 +65,6 @@ impl SQLType {
             self.name = other.name;
             self.index = other.index;
             self.subindex = other.subindex;
-            self.fixed = other.fixed;
             self.size = other.size;
             self.scale = other.scale;
         }
@@ -77,12 +74,12 @@ impl SQLType {
 impl fmt::Display for SQLType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut name = if self.name == SQLTypeName::Varcharmax {
-            "varchar(max)".to_string()
+            "VARCHAR(MAX)".to_string()
         } else {
-            format!("{:?}", self.name).to_ascii_lowercase()
+            format!("{:?}", self.name).to_ascii_uppercase()
         };
         let size = self.size + self.scale;
-        if self.size > 0 || name.contains("time") {
+        if self.size > 0 || name.contains("TIME") {
             name.push_str(&format!("({}", size));
             if self.scale > 0 {
                 name.push_str(&format!(", {}", self.scale));
@@ -111,7 +108,6 @@ pub fn infer(value: &str, index: usize, subindex: usize) -> Option<SQLType> {
     None
 }
 // multiple compare function should check if return value is greater or less than previous, advance
-// if fixed is true and values differ, if none then advance
 //
 // infer function walks through functions in order of priority until Some, return Some
 
@@ -306,7 +302,6 @@ fn check_char(value: &str, _subindex: usize) -> Option<SQLType> {
         Some(SQLType {
             name: SQLTypeName::Char,
             size: value.len(),
-            fixed: true,
             ..Default::default()
         })
     } else {
