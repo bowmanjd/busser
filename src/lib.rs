@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use csv::{Reader, ReaderBuilder, Terminator};
+use simdutf8::basic::from_utf8;
 use std::ffi::OsString;
 use std::fs;
 use std::fs::File;
@@ -13,7 +14,7 @@ pub mod view;
 
 type HeaderGen = fn(&mut BufWriter<File>, &str, &[String]) -> Result<()>;
 type FooterGen = fn(&mut BufWriter<File>, &str, &[String], &[infer::SQLType]) -> Result<()>;
-type FieldProcessor = fn(&mut BufWriter<File>, &str, &str) -> Result<()>;
+type FieldProcessor = fn(&mut BufWriter<File>, &str, &[u8]) -> Result<()>;
 
 struct OutputConfig {
     row_sep: Vec<u8>,
@@ -177,11 +178,13 @@ pub fn csv_survey(
         ]);
     }
 
-    for result in rdr.records() {
+    for result in rdr.byte_records() {
         stats.row_count += 1;
         let row = result?;
         for (i, value) in row.iter().enumerate() {
-            stats.column_char_lengths[i] = stats.column_char_lengths[i].max(value.chars().count());
+            let valuestr = from_utf8(value)?;
+            stats.column_char_lengths[i] =
+                stats.column_char_lengths[i].max(valuestr.chars().count());
             stats.column_byte_lengths[i] = stats.column_byte_lengths[i].max(value.len());
             if infer {
                 let Some(ref mut sqltypes) = stats.column_types else { todo!() };
@@ -215,7 +218,7 @@ pub fn csv_schema(csvfile: &PathBuf, tablename: &str, ascii_delimited: bool) -> 
         row_length
     ];
 
-    for result in rdr.records() {
+    for result in rdr.byte_records() {
         let row = result?;
         for (i, value) in row.iter().enumerate() {
             if let Some(sqltype) = infer::infer(value, sqltypes[i].index, sqltypes[i].subindex) {
@@ -230,28 +233,30 @@ pub fn csv_schema(csvfile: &PathBuf, tablename: &str, ascii_delimited: bool) -> 
     ))
 }
 
-fn field_processor_bcp(stream: &mut BufWriter<File>, _column: &str, value: &str) -> Result<()> {
+fn field_processor_bcp(stream: &mut BufWriter<File>, _column: &str, value: &[u8]) -> Result<()> {
     stream.write_all(value.as_ref())?;
     Ok(())
 }
 
-fn field_processor_json(stream: &mut BufWriter<File>, column: &str, value: &str) -> Result<()> {
-    let mut new_value = String::new();
+fn field_processor_json(stream: &mut BufWriter<File>, column: &str, value: &[u8]) -> Result<()> {
+    //let mut new_value = String::new();
+    let mut new_value: Vec<u8> = b"".to_vec();
     if value.is_empty() {
-        new_value.push_str("null");
+        new_value.extend(b"null");
     } else {
-        new_value.push('"');
-        for char in value.chars() {
+        new_value.push(b'"');
+        for char in value {
             match char {
-                '\\' => new_value.push_str("\\\\"),
-                '"' => new_value.push_str("\\\""),
-                '\'' => new_value.push_str("''"),
-                _ => new_value.push(char),
+                b'\\' => new_value.extend(b"\\\\"),
+                b'"' => new_value.extend(b"\\\""),
+                b'\'' => new_value.extend(b"''"),
+                _ => new_value.push(*char),
             }
         }
-        new_value.push('"');
+        new_value.push(b'"');
     }
-    write!(stream, "\"{}\": {}", column, &new_value)?;
+    write!(stream, "\"{}\": ", column)?;
+    stream.write_all(&new_value)?;
     Ok(())
 }
 
@@ -457,7 +462,7 @@ fn csv_into(
         page = 1;
     }
 
-    for (rounds, result) in rdr.records().enumerate() {
+    for (rounds, result) in rdr.byte_records().enumerate() {
         if page_size > 0 && rounds > 0 && (rounds % page_size) == 0 {
             if let Some(page_footer) = config.page_footer {
                 page_footer(&mut stream, tablename, &columns, &sqltypes)?;
