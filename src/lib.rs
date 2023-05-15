@@ -1,3 +1,10 @@
+// Copyright 2023 Jonathan Bowman
+//
+// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
+// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
+// http://opensource.org/licenses/MIT>, at your option. This file may not be
+// copied, modified, or distributed except according to those terms.
+
 use anyhow::{Context, Result};
 use csv::{Reader, ReaderBuilder, Terminator};
 use simdutf8::basic::from_utf8;
@@ -72,7 +79,7 @@ fn csv_reader(
     let rdr = ReaderBuilder::new()
         .delimiter(field_sep)
         .terminator(sep)
-        .buffer_capacity(16384)
+        .buffer_capacity(65536)
         .from_path(csvfile)
         .with_context(|| format!("Failed to read csv from {:?}", csvfile))?;
     Ok(rdr)
@@ -217,9 +224,8 @@ pub fn csv_schema(csvfile: &PathBuf, tablename: &str, ascii_delimited: bool) -> 
         };
         row_length
     ];
-
-    for result in rdr.byte_records() {
-        let row = result?;
+    let mut row = csv::ByteRecord::new();
+    while rdr.read_byte_record(&mut row)? {
         for (i, value) in row.iter().enumerate() {
             if let Some(sqltype) = infer::infer(value, sqltypes[i].index, sqltypes[i].subindex) {
                 sqltypes[i].merge(&sqltype);
@@ -240,23 +246,23 @@ fn field_processor_bcp(stream: &mut BufWriter<File>, _column: &str, value: &[u8]
 
 fn field_processor_json(stream: &mut BufWriter<File>, column: &str, value: &[u8]) -> Result<()> {
     //let mut new_value = String::new();
-    let mut new_value: Vec<u8> = b"".to_vec();
+    stream.write_all(b"\"")?;
+    stream.write_all(column.as_bytes())?;
+    stream.write_all(b"\": ")?;
     if value.is_empty() {
-        new_value.extend(b"null");
+        stream.write_all(b"null")?;
     } else {
-        new_value.push(b'"');
+        stream.write_all(b"\"")?;
         for char in value {
             match char {
-                b'\\' => new_value.extend(b"\\\\"),
-                b'"' => new_value.extend(b"\\\""),
-                b'\'' => new_value.extend(b"''"),
-                _ => new_value.push(*char),
+                b'\\' => stream.write_all(b"\\\\")?,
+                b'"' => stream.write_all(b"\\\"")?,
+                b'\'' => stream.write_all(b"''")?,
+                _ => stream.write_all(&[*char])?,
             }
         }
-        new_value.push(b'"');
+        stream.write_all(b"\"")?;
     }
-    write!(stream, "\"{}\": ", column)?;
-    stream.write_all(&new_value)?;
     Ok(())
 }
 

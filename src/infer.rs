@@ -1,3 +1,10 @@
+// Copyright 2023 Jonathan Bowman
+//
+// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
+// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
+// http://opensource.org/licenses/MIT>, at your option. This file may not be
+// copied, modified, or distributed except according to those terms.
+
 use atoi::atoi;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Timelike};
 use simdutf8::basic::from_utf8;
@@ -279,10 +286,9 @@ fn check_float(mut value: ByteText, _subindex: usize) -> Option<SQLType> {
 }
 
 fn check_date(mut value: ByteText, subindex: usize) -> Option<SQLType> {
-    let value = value.text();
     for i in (subindex..formats::DATE_FORMATS.len()).chain(0..subindex) {
         let form = formats::DATE_FORMATS[i];
-        if NaiveDate::parse_from_str(value, form).is_ok() {
+        if NaiveDate::parse_from_str(value.text(), form).is_ok() {
             return Some(SQLType {
                 name: SQLTypeName::Date,
                 subindex,
@@ -341,10 +347,9 @@ fn check_datetimeoffset(mut value: ByteText, subindex: usize) -> Option<SQLType>
 }
 
 fn check_datetime(mut value: ByteText, subindex: usize) -> Option<SQLType> {
-    let value = value.text();
     for i in (subindex..formats::DATETIME_FORMATS.len()).chain(0..subindex) {
         let form = formats::DATETIME_FORMATS[i];
-        if let Ok(parsed) = NaiveDateTime::parse_from_str(value, form) {
+        if let Ok(parsed) = NaiveDateTime::parse_from_str(value.text(), form) {
             return Some(SQLType {
                 name: SQLTypeName::Datetime2,
                 subindex,
