@@ -2,8 +2,6 @@
 
 A tool that handles tables
 
-![DROP TABLE IF EXISTS Departmental_Silos](collaborate.svg)
-
 ## License
 
 Licensed under either of
