@@ -1,3 +1,4 @@
+#![allow(unused)]  // FIXME
 // Copyright 2023 Jonathan Bowman
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
@@ -369,7 +370,25 @@ fn check_datetimeoffset(mut value: ByteText, subindex: usize) -> Option<SQLType>
     for i in (subindex..formats::DATETIMEOFFSET_FORMATS.len()).chain(0..subindex) {
         let form = formats::DATETIMEOFFSET_FORMATS[i];
         if let Ok(parsed) = DateTime::parse_from_str(value, form)
-            .or(DateTime::parse_from_str(&format!("{}+00:00", &value), form))
+            .or_else(|_| DateTime::parse_from_str(&format!("{}+00:00", &value), form))
+        {
+            return Some(SQLType {
+                name: SQLTypeName::Datetimeoffset,
+                subindex,
+                size: time_precision(parsed.nanosecond()),
+                ..Default::default()
+            });
+        }
+    }
+    None
+}
+
+fn tcheck_datetimeoffset(mut value: ByteText, subindex: usize) -> Option<SQLType> {
+    let value = value.text();
+    for i in (subindex..timeformats::DATETIMEOFFSET_FORMATS.len()).chain(0..subindex) {
+        let form = timeformats::DATETIMEOFFSET_FORMATS[i];
+        if let Ok(parsed) = OffsetDateTime::parse(value, form)
+            .or_else(|_| OffsetDateTime::parse(&format!("{}+00:00", &value), form))
         {
             return Some(SQLType {
                 name: SQLTypeName::Datetimeoffset,
