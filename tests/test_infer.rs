@@ -16,9 +16,17 @@ fn two_is_tinyint() {
 }
 
 #[test]
-fn utc_datetimeoffset() {
+fn utc_datetime() {
     assert_eq!(
         infer(b"2002-11-09T07:18:21Z", 0, 0).unwrap().name,
+        SQLTypeName::Datetime2
+    );
+}
+
+#[test]
+fn utc_datetimeoffset() {
+    assert_eq!(
+        infer(b"2002-11-09T07:18:21+00:00", 0, 0).unwrap().name,
         SQLTypeName::Datetimeoffset
     );
 }
