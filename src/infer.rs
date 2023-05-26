@@ -7,12 +7,10 @@
 // copied, modified, or distributed except according to those terms.
 
 use atoi::atoi;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Timelike};
 use time::{Date, OffsetDateTime, PrimitiveDateTime, Time};
 use simdutf8::basic::from_utf8;
 use std::fmt;
 
-mod formats;
 mod timeformats;
 
 #[derive(Clone, Copy)]
@@ -68,10 +66,10 @@ const CHECKS: [&Check; 15] = [
     &(check_decimal as Check),
     &(check_real as Check),
     &(check_float as Check),
-    &(tcheck_date as Check),
-    &(tcheck_time as Check),
-    &(tcheck_datetime as Check),
-    &(tcheck_datetimeoffset as Check),
+    &(check_date as Check),
+    &(check_time as Check),
+    &(check_datetime as Check),
+    &(check_datetimeoffset as Check),
     &(check_char as Check),
     &(check_varchar as Check),
     &(check_varcharmax as Check),
@@ -288,24 +286,10 @@ fn check_float(mut value: ByteText, _subindex: usize) -> Option<SQLType> {
     }
 }
 
-fn tcheck_date(mut value: ByteText, subindex: usize) -> Option<SQLType> {
+fn check_date(mut value: ByteText, subindex: usize) -> Option<SQLType> {
     for i in (subindex..timeformats::DATE_FORMATS.len()).chain(0..subindex) {
         let form = timeformats::DATE_FORMATS[i];
         if Date::parse(value.text(), form).is_ok() {
-            return Some(SQLType {
-                name: SQLTypeName::Date,
-                subindex,
-                ..Default::default()
-            });
-        }
-    }
-    None
-}
-
-fn check_date(mut value: ByteText, subindex: usize) -> Option<SQLType> {
-    for i in (subindex..formats::DATE_FORMATS.len()).chain(0..subindex) {
-        let form = formats::DATE_FORMATS[i];
-        if NaiveDate::parse_from_str(value.text(), form).is_ok() {
             return Some(SQLType {
                 name: SQLTypeName::Date,
                 subindex,
@@ -331,26 +315,6 @@ fn check_time(mut value: ByteText, subindex: usize) -> Option<SQLType> {
     if value.parse::<u8>().is_ok() {
         return None;
     }
-    for i in (subindex..formats::TIME_FORMATS.len()).chain(0..subindex) {
-        let form = formats::TIME_FORMATS[i];
-        if let Ok(parsed) = NaiveTime::parse_from_str(value, form) {
-            return Some(SQLType {
-                name: SQLTypeName::Time,
-                subindex,
-                size: time_precision(parsed.nanosecond()),
-                ..Default::default()
-            });
-        }
-    }
-    None
-}
-
-fn tcheck_time(mut value: ByteText, subindex: usize) -> Option<SQLType> {
-    let value = value.text();
-    // Fail if straight integer
-    if value.parse::<u8>().is_ok() {
-        return None;
-    }
     for i in (subindex..timeformats::TIME_FORMATS.len()).chain(0..subindex) {
         let form = timeformats::TIME_FORMATS[i];
         if let Ok(parsed) = Time::parse(value, form) {
@@ -366,24 +330,6 @@ fn tcheck_time(mut value: ByteText, subindex: usize) -> Option<SQLType> {
 }
 
 fn check_datetimeoffset(mut value: ByteText, subindex: usize) -> Option<SQLType> {
-    let value = value.text();
-    for i in (subindex..formats::DATETIMEOFFSET_FORMATS.len()).chain(0..subindex) {
-        let form = formats::DATETIMEOFFSET_FORMATS[i];
-        if let Ok(parsed) = DateTime::parse_from_str(value, form)
-            .or_else(|_| DateTime::parse_from_str(&format!("{}+00:00", &value), form))
-        {
-            return Some(SQLType {
-                name: SQLTypeName::Datetimeoffset,
-                subindex,
-                size: time_precision(parsed.nanosecond()),
-                ..Default::default()
-            });
-        }
-    }
-    None
-}
-
-fn tcheck_datetimeoffset(mut value: ByteText, subindex: usize) -> Option<SQLType> {
     let value = value.text();
     for i in (subindex..timeformats::DATETIMEOFFSET_FORMATS.len()).chain(0..subindex) {
         let form = timeformats::DATETIMEOFFSET_FORMATS[i];
@@ -402,21 +348,6 @@ fn tcheck_datetimeoffset(mut value: ByteText, subindex: usize) -> Option<SQLType
 }
 
 fn check_datetime(mut value: ByteText, subindex: usize) -> Option<SQLType> {
-    for i in (subindex..formats::DATETIME_FORMATS.len()).chain(0..subindex) {
-        let form = formats::DATETIME_FORMATS[i];
-        if let Ok(parsed) = NaiveDateTime::parse_from_str(value.text(), form) {
-            return Some(SQLType {
-                name: SQLTypeName::Datetime2,
-                subindex,
-                size: time_precision(parsed.nanosecond()),
-                ..Default::default()
-            });
-        }
-    }
-    None
-}
-
-fn tcheck_datetime(mut value: ByteText, subindex: usize) -> Option<SQLType> {
     for i in (subindex..timeformats::DATETIME_FORMATS.len()).chain(0..subindex) {
         let form = timeformats::DATETIME_FORMATS[i];
         if let Ok(parsed) = PrimitiveDateTime::parse(value.text(), form) {
