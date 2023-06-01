@@ -1,4 +1,3 @@
-#![allow(unused)]  // FIXME
 // Copyright 2023 Jonathan Bowman
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
@@ -7,9 +6,9 @@
 // copied, modified, or distributed except according to those terms.
 
 use atoi::atoi;
-use time::{Date, OffsetDateTime, PrimitiveDateTime, Time};
 use simdutf8::basic::from_utf8;
 use std::fmt;
+use time::{Date, OffsetDateTime, PrimitiveDateTime, Time};
 
 mod timeformats;
 
@@ -82,10 +81,12 @@ pub struct SQLType {
     pub index: usize,
     pub subindex: usize,
     pub scale: usize,
+    pub byte_length: usize,
 }
 
 impl SQLType {
     pub fn merge(&mut self, other: &Self) {
+        self.byte_length = other.byte_length.max(self.byte_length);
         if self.name == other.name && other.name == SQLTypeName::Char && other.size != self.size {
             self.name = SQLTypeName::Varchar;
             self.size = other.size.max(self.size);
@@ -95,10 +96,14 @@ impl SQLType {
             self.size = other.size.max(self.size);
             self.scale = other.scale.max(self.scale);
         } else if self.index < other.index {
+            if other.name == SQLTypeName::Char {
+                self.size = other.size.max(self.byte_length);
+            } else {
+                self.size = other.size;
+            }
             self.name = other.name;
             self.index = other.index;
             self.subindex = other.subindex;
-            self.size = other.size;
             self.scale = other.scale;
         }
     }
@@ -130,11 +135,13 @@ pub fn infer(value: &[u8], mut index: usize, subindex: usize) -> Option<SQLType>
         });
     }
     let value = ByteText::new(value);
+    let byte_length = value.bytes.len();
     while index < CHECKS.len() {
         let fun = CHECKS[index];
 
         if let Some(mut typesize) = fun(value, subindex) {
             typesize.index = index;
+            typesize.byte_length = byte_length;
             return Some(typesize);
         } else {
             index += 1;
@@ -142,9 +149,6 @@ pub fn infer(value: &[u8], mut index: usize, subindex: usize) -> Option<SQLType>
     }
     None
 }
-// multiple compare function should check if return value is greater or less than previous, advance
-//
-// infer function walks through functions in order of priority until Some, return Some
 
 fn check_bit(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
@@ -224,14 +228,15 @@ fn trim(value: &[u8]) -> &[u8] {
 fn check_decimal(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
     let length = value.iter().filter(|c| c.is_ascii_digit()).count();
-    // TODO: check for one or zero - at beginning
     // TODO: check for one or zero .
-    let value: &[u8] = if value[0] == b'-' { &value[1..] } else { value };
+    let value: &[u8] = if value.len() > 0 && value[0] == b'-' {
+        &value[1..]
+    } else {
+        value
+    };
     if value.iter().filter(|c| **c == b'.').count() <= 1
         && value.iter().all(|c| match c {
-            b'.' | b'0' | b'1' | b'2' | b'3' | b'4' | b'5' | b'6' | b'7' | b'8' | b'9' => {
-                true
-            }
+            b'.' | b'0' | b'1' | b'2' | b'3' | b'4' | b'5' | b'6' | b'7' | b'8' | b'9' => true,
             _ => false,
         })
         && length <= 38

@@ -48,6 +48,17 @@ fn datetime_if_no_tz() {
 }
 
 #[test]
+fn accurate_length_merge_integer_char() {
+    let mut num = infer(b"123456789", 0, 0).unwrap();
+    let char = infer(b"abcd", 0, 0).unwrap();
+    num.merge(&char);
+    assert_eq!(
+        num.size,
+        9
+    );
+}
+
+#[test]
 fn precision_count() {
     println!("{:?}", infer(b"01:00:00.012", 0, 0));
     assert_eq!(3, infer(b"01:00:00.012", 0, 0).unwrap().size);
