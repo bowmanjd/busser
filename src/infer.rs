@@ -107,6 +107,14 @@ impl SQLType {
             self.scale = other.scale;
         }
     }
+
+    pub fn varchar(&self) -> String {
+        if self.name == SQLTypeName::Varcharmax {
+            "VARCHAR(MAX)".to_string()
+        } else {
+            format!("VARCHAR({})", self.byte_length)
+        }
+    }
 }
 
 impl fmt::Display for SQLType {

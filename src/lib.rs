@@ -303,7 +303,7 @@ fn page_footer_json(
     columns: &[String],
     sqltypes: &[infer::SQLType],
 ) -> Result<()> {
-    let schema = schema_string(columns, sqltypes);
+    let schema = schema_string_varchar(columns, sqltypes);
     writeln!(stream, "}} \\\n]') WITH ({});", schema)?;
     Ok(())
 }
@@ -519,6 +519,17 @@ fn schema_string(columns: &[String], sqltypes: &[infer::SQLType]) -> String {
             schema.push_str(", ");
         }
         schema.push_str(&format!("{} {}", column, sqlt));
+    }
+    schema
+}
+
+fn schema_string_varchar(columns: &[String], sqltypes: &[infer::SQLType]) -> String {
+    let mut schema = String::new();
+    for (i, (column, sqlt)) in zip(columns, sqltypes).enumerate() {
+        if i > 0 {
+            schema.push_str(", ");
+        }
+        schema.push_str(&format!("{} {}", column, sqlt.varchar()));
     }
     schema
 }
