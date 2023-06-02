@@ -23,6 +23,7 @@ enum Subcommands {
     Columns(ColumnsCmd),
     Schema(SchemaCmd),
     View(ViewCmd),
+    Stats(StatsCmd),
 }
 
 /// Output special formats from CSV input
@@ -71,6 +72,23 @@ struct ColumnsCmd {
     raw: bool,
 }
 
+/// Get stats on CSV file
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "stats")]
+struct StatsCmd {
+    /// CSV file path
+    #[argh(positional)]
+    csvfile: PathBuf,
+
+    /// infer SQL type
+    #[argh(switch, short = 'i')]
+    infer: bool,
+
+    /// compute UTF-8 character lengths
+    #[argh(switch, short = 'u')]
+    utf8: bool,
+}
+
 /// View CSV file
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "view")]
@@ -117,17 +135,13 @@ struct SchemaCmd {
     chars: bool,
 }
 
-fn view(args: ViewCmd) -> Result<()> {
-    /*
-    let stats = busser::csv_survey(
-        &args.csvfile,
-        false,
-        None,
-        None,
-        None,
-        )?;
+fn stats(args: StatsCmd) -> Result<()> {
+    let stats = busser::csv_survey(&args.csvfile, args.infer, args.utf8, None, None, None)?;
     println!("{:?}", stats);
-    */
+    Ok(())
+}
+
+fn view(args: ViewCmd) -> Result<()> {
     busser::view::view(
         &args.csvfile,
         args.rows.as_deref(),
@@ -179,6 +193,7 @@ pub fn run(args: Args) -> Result<()> {
         Subcommands::Output(args) => output(args)?,
         Subcommands::Schema(args) => schema(args)?,
         Subcommands::View(args) => view(args)?,
+        Subcommands::Stats(args) => stats(args)?,
     }
 
     Ok(())

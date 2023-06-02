@@ -162,6 +162,7 @@ pub struct CsvStats {
 pub fn csv_survey(
     csvfile: &PathBuf,
     infer: bool,
+    utf8: bool,
     tablename: Option<&str>,
     field_sep: Option<u8>,
     row_sep: Option<u8>,
@@ -172,7 +173,9 @@ pub fn csv_survey(
     stats.columns = csv_columns(csvfile, tablename, false, field_sep, row_sep)?;
     stats.raw_columns = csv_columns(csvfile, tablename, true, field_sep, row_sep)?;
     stats.column_count = stats.columns.len();
-    stats.column_char_lengths = stats.columns.iter().map(|x| x.chars().count()).collect();
+    if utf8 {
+        stats.column_char_lengths = stats.columns.iter().map(|x| x.chars().count()).collect();
+    }
     stats.column_byte_lengths = stats.columns.iter().map(|x| x.len()).collect();
 
     let mut rdr = csv_reader(csvfile, field_sep, row_sep)?;
@@ -189,9 +192,10 @@ pub fn csv_survey(
         stats.row_count += 1;
         let row = result?;
         for (i, value) in row.iter().enumerate() {
-            let valuestr = from_utf8(value)?;
+            if utf8 {
             stats.column_char_lengths[i] =
-                stats.column_char_lengths[i].max(valuestr.chars().count());
+                stats.column_char_lengths[i].max(from_utf8(value)?.chars().count());
+            }
             stats.column_byte_lengths[i] = stats.column_byte_lengths[i].max(value.len());
             if infer {
                 let Some(ref mut sqltypes) = stats.column_types else { todo!() };

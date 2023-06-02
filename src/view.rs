@@ -72,7 +72,7 @@ pub fn view(
     };
     println!("row_range: {:?}\ncol_range: {:?}", row_range, col_range);
 
-    let mut stats = crate::csv_survey(csvfile, false, None, field_sep, row_sep)?;
+    let mut stats = crate::csv_survey(csvfile, false, true, None, field_sep, row_sep)?;
     let mut rdr = crate::csv_reader(csvfile, field_sep, row_sep)?;
 
     //let mut column_lengths = &mut stats.column_char_lengths;
