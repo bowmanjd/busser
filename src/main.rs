@@ -1,5 +1,5 @@
-use std::process;
 use mimalloc::MiMalloc;
+use std::process;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;

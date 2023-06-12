@@ -193,8 +193,8 @@ pub fn csv_survey(
         let row = result?;
         for (i, value) in row.iter().enumerate() {
             if utf8 {
-            stats.column_char_lengths[i] =
-                stats.column_char_lengths[i].max(from_utf8(value)?.chars().count());
+                stats.column_char_lengths[i] =
+                    stats.column_char_lengths[i].max(from_utf8(value)?.chars().count());
             }
             stats.column_byte_lengths[i] = stats.column_byte_lengths[i].max(value.len());
             if infer {

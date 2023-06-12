@@ -126,18 +126,19 @@ struct SchemaCmd {
     #[argh(option, short = 't')]
     table: String,
 
+    /// ASCII delimited
     #[argh(switch, short = 'a')]
-    /// use only varchars as type
     asciidelimited: bool,
 
-    #[argh(switch, short = 'c')]
     /// use only varchars as type
+    #[argh(switch, short = 'c')]
     chars: bool,
 }
 
 fn stats(args: StatsCmd) -> Result<()> {
     let stats = busser::csv_survey(&args.csvfile, args.infer, args.utf8, None, None, None)?;
-    println!("{:?}", stats);
+    dbg!(stats);
+    //println!("{:?}", stats);
     Ok(())
 }
 
