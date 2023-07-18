@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 pub mod infer;
 mod keywords;
 pub mod view;
+//pub mod reader;
 
 type HeaderGen = fn(&mut BufWriter<File>, &str, &[String]) -> Result<()>;
 type FooterGen = fn(&mut BufWriter<File>, &str, &[String], &[infer::SQLType]) -> Result<()>;

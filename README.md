@@ -1,6 +1,24 @@
 # busser
 
-A tool that handles tables
+A tool that handles tables.
+
+Primarily CSV files and Microsoft SQL Server tables.
+
+## Usage
+
+Busser combines multiple tools into a single command line interface. Executing
+
+```sh
+busser --help
+```
+
+is a good start, and each subcommand has its own help as well. For instance:
+
+```sh
+busser output --help
+```
+
+Busser is not quite ready for public consumption. The command line interface changes rapidly, and sometimes things break.
 
 ## License
 
