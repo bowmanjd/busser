@@ -263,6 +263,8 @@ fn field_processor_json(stream: &mut BufWriter<File>, column: &str, value: &[u8]
                 b'\\' => stream.write_all(b"\\\\")?,
                 b'"' => stream.write_all(b"\\\"")?,
                 b'\'' => stream.write_all(b"''")?,
+                b'\r' => stream.write_all(b"")?,
+                b'\n' => stream.write_all(b"\\n")?,
                 _ => stream.write_all(&[*char])?,
             }
         }
@@ -377,6 +379,7 @@ pub fn csv_into_bcp_fast(
             stream.write_all(value)?;
         }
     }
+    stream.write_all(&row_sep)?;
     Ok(())
 }
 

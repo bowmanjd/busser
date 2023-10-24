@@ -112,7 +112,7 @@ impl SQLType {
         if self.name == SQLTypeName::Varcharmax {
             "VARCHAR(MAX)".to_string()
         } else {
-            format!("VARCHAR({})", self.byte_length)
+            format!("VARCHAR({})", if self.byte_length == 0 { 1 } else { self.byte_length })
         }
     }
 }
