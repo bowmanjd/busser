@@ -11,8 +11,23 @@ fn one_is_bit() {
 }
 
 #[test]
+fn dot_is_char() {
+    assert_eq!(infer(b".", 0, 0).unwrap().name, SQLTypeName::Char);
+}
+
+#[test]
 fn two_is_tinyint() {
     assert_eq!(infer(b"2", 0, 0).unwrap().name, SQLTypeName::Tinyint);
+}
+
+#[test]
+fn negative_thousand_is_smallint() {
+    assert_eq!(infer(b"-1000", 0, 0).unwrap().name, SQLTypeName::Smallint);
+}
+
+#[test]
+fn negative_million_is_int() {
+    assert_eq!(infer(b"-1000000", 0, 0).unwrap().name, SQLTypeName::Int);
 }
 
 #[test]

@@ -175,6 +175,11 @@ fn check_bit(value: ByteText, _subindex: usize) -> Option<SQLType> {
 
 fn check_tinyint(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
+    let value: &[u8] = if value.len() > 0 && value[0] == b'-' {
+        &value[1..]
+    } else {
+        value
+    };
     if value.iter().all(u8::is_ascii_digit) && atoi::<u8>(value).is_some() {
         Some(SQLType {
             name: SQLTypeName::Tinyint,
@@ -187,6 +192,11 @@ fn check_tinyint(value: ByteText, _subindex: usize) -> Option<SQLType> {
 
 fn check_smallint(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
+    let value: &[u8] = if value.len() > 0 && value[0] == b'-' {
+        &value[1..]
+    } else {
+        value
+    };
     if value.iter().all(u8::is_ascii_digit) && atoi::<i16>(value).is_some() {
         Some(SQLType {
             name: SQLTypeName::Smallint,
@@ -199,6 +209,11 @@ fn check_smallint(value: ByteText, _subindex: usize) -> Option<SQLType> {
 
 fn check_int(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
+    let value: &[u8] = if value.len() > 0 && value[0] == b'-' {
+        &value[1..]
+    } else {
+        value
+    };
     if value.iter().all(u8::is_ascii_digit) && atoi::<i32>(value).is_some() {
         Some(SQLType {
             name: SQLTypeName::Int,
@@ -211,6 +226,11 @@ fn check_int(value: ByteText, _subindex: usize) -> Option<SQLType> {
 
 fn check_bigint(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
+    let value: &[u8] = if value.len() > 0 && value[0] == b'-' {
+        &value[1..]
+    } else {
+        value
+    };
     if value.iter().all(u8::is_ascii_digit) && atoi::<i64>(value).is_some() {
         Some(SQLType {
             name: SQLTypeName::Bigint,
@@ -236,13 +256,13 @@ fn trim(value: &[u8]) -> &[u8] {
 fn check_decimal(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
     let length = value.iter().filter(|c| c.is_ascii_digit()).count();
-    // TODO: check for one or zero .
     let value: &[u8] = if value.len() > 0 && value[0] == b'-' {
         &value[1..]
     } else {
         value
     };
     if value.iter().filter(|c| **c == b'.').count() <= 1
+        && value != b"."
         && value.iter().all(|c| match c {
             b'.' | b'0' | b'1' | b'2' | b'3' | b'4' | b'5' | b'6' | b'7' | b'8' | b'9' => true,
             _ => false,
