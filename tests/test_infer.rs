@@ -16,6 +16,11 @@ fn dot_is_char() {
 }
 
 #[test]
+fn leading_zero_is_varchar() {
+    assert_eq!(infer(b"0123", 0, 0).unwrap().name, SQLTypeName::Varchar);
+}
+
+#[test]
 fn two_is_tinyint() {
     assert_eq!(infer(b"2", 0, 0).unwrap().name, SQLTypeName::Tinyint);
 }
