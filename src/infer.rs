@@ -179,7 +179,6 @@ fn check_tinyint(value: ByteText, _subindex: usize) -> Option<SQLType> {
     if value.len() > 0 && value[0] == b'0' {
         return None;
     }
-    let value = signed(value);
     if value.iter().all(u8::is_ascii_digit) && atoi::<u8>(value).is_some() {
         Some(SQLType {
             name: SQLTypeName::Tinyint,
