@@ -176,7 +176,7 @@ fn check_bit(value: ByteText, _subindex: usize) -> Option<SQLType> {
 
 fn check_tinyint(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
-    if value[0] == b'0' {
+    if value.len() > 0 && value[0] == b'0' {
         return None;
     }
     let value = signed(value);
@@ -192,7 +192,7 @@ fn check_tinyint(value: ByteText, _subindex: usize) -> Option<SQLType> {
 
 fn check_smallint(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
-    if value[0] == b'0' {
+    if value.len() > 0 && value[0] == b'0' {
         return None;
     }
     let value = signed(value);
@@ -208,7 +208,7 @@ fn check_smallint(value: ByteText, _subindex: usize) -> Option<SQLType> {
 
 fn check_int(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
-    if value[0] == b'0' {
+    if value.len() > 0 && value[0] == b'0' {
         return None;
     }
     let value = signed(value);
@@ -224,7 +224,7 @@ fn check_int(value: ByteText, _subindex: usize) -> Option<SQLType> {
 
 fn check_bigint(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
-    if value[0] == b'0' {
+    if value.len() > 0 && value[0] == b'0' {
         return None;
     }
     let value = signed(value);
@@ -260,7 +260,7 @@ fn trim(value: &[u8]) -> &[u8] {
 
 fn check_decimal(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
-    if value[0] == b'0' {
+    if value.len() > 0 && value[0] == b'0' {
         return None;
     }
     let length = value.iter().filter(|c| c.is_ascii_digit()).count();
@@ -297,7 +297,7 @@ fn check_decimal(value: ByteText, _subindex: usize) -> Option<SQLType> {
 }
 
 fn check_real(mut value: ByteText, _subindex: usize) -> Option<SQLType> {
-    if value.bytes[0] == b'0' {
+    if value.bytes.len() > 0 && value.bytes[0] == b'0' {
         return None;
     }
     let value = value.text();
@@ -314,7 +314,7 @@ fn check_real(mut value: ByteText, _subindex: usize) -> Option<SQLType> {
 }
 
 fn check_float(mut value: ByteText, _subindex: usize) -> Option<SQLType> {
-    if value.bytes[0] == b'0' {
+    if value.bytes.len() > 0 && value.bytes[0] == b'0' {
         return None;
     }
     let value = value.text();
