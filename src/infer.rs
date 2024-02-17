@@ -112,7 +112,14 @@ impl SQLType {
         if self.name == SQLTypeName::Varcharmax {
             "VARCHAR(MAX)".to_string()
         } else {
-            format!("VARCHAR({})", if self.byte_length == 0 { 1 } else { self.byte_length })
+            format!(
+                "VARCHAR({})",
+                if self.byte_length == 0 {
+                    1
+                } else {
+                    self.byte_length
+                }
+            )
         }
     }
 }
@@ -166,7 +173,6 @@ fn check_bit(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let bit = atoi::<i8>(value).unwrap_or_else(|| -1);
     if bit == 1 || bit == 0 {
         Some(SQLType {
-            name: SQLTypeName::Bit,
             ..Default::default()
         })
     } else {
@@ -176,7 +182,7 @@ fn check_bit(value: ByteText, _subindex: usize) -> Option<SQLType> {
 
 fn check_tinyint(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
-    if value.len() > 0 && value[0] == b'0' {
+    if value.len() > 0 && value[0] == b'0' && !value.iter().all(|&x| x == b'0') {
         return None;
     }
     if value.iter().all(u8::is_ascii_digit) && atoi::<u8>(value).is_some() {
@@ -191,7 +197,7 @@ fn check_tinyint(value: ByteText, _subindex: usize) -> Option<SQLType> {
 
 fn check_smallint(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
-    if value.len() > 0 && value[0] == b'0' {
+    if value.len() > 0 && value[0] == b'0' && !value.iter().all(|&x| x == b'0') {
         return None;
     }
     let value = signed(value);
@@ -207,7 +213,7 @@ fn check_smallint(value: ByteText, _subindex: usize) -> Option<SQLType> {
 
 fn check_int(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
-    if value.len() > 0 && value[0] == b'0' {
+    if value.len() > 0 && value[0] == b'0' && !value.iter().all(|&x| x == b'0') {
         return None;
     }
     let value = signed(value);
@@ -223,7 +229,7 @@ fn check_int(value: ByteText, _subindex: usize) -> Option<SQLType> {
 
 fn check_bigint(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
-    if value.len() > 0 && value[0] == b'0' {
+    if value.len() > 0 && value[0] == b'0' && !value.iter().all(|&x| x == b'0') {
         return None;
     }
     let value = signed(value);
@@ -259,7 +265,7 @@ fn trim(value: &[u8]) -> &[u8] {
 
 fn check_decimal(value: ByteText, _subindex: usize) -> Option<SQLType> {
     let value = trim(value.bytes);
-    if value.len() > 0 && value[0] == b'0' {
+    if value.len() > 0 && value[0] == b'0' && !value.iter().all(|&x| x == b'0' || x == b'.') {
         return None;
     }
     let length = value.iter().filter(|c| c.is_ascii_digit()).count();
@@ -296,7 +302,10 @@ fn check_decimal(value: ByteText, _subindex: usize) -> Option<SQLType> {
 }
 
 fn check_real(mut value: ByteText, _subindex: usize) -> Option<SQLType> {
-    if value.bytes.len() > 0 && value.bytes[0] == b'0' {
+    if value.bytes.len() > 0
+        && value.bytes[0] == b'0'
+        && !value.bytes.iter().all(|&x| x == b'0' || x == b'.')
+    {
         return None;
     }
     let value = value.text();
@@ -313,7 +322,10 @@ fn check_real(mut value: ByteText, _subindex: usize) -> Option<SQLType> {
 }
 
 fn check_float(mut value: ByteText, _subindex: usize) -> Option<SQLType> {
-    if value.bytes.len() > 0 && value.bytes[0] == b'0' {
+    if value.bytes.len() > 0
+        && value.bytes[0] == b'0'
+        && !value.bytes.iter().all(|&x| x == b'0' || x == b'.')
+    {
         return None;
     }
     let value = value.text();

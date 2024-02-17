@@ -11,6 +11,11 @@ fn one_is_bit() {
 }
 
 #[test]
+fn blank_is_bit() {
+    assert_eq!(infer(b"", 0, 0).unwrap().name, SQLTypeName::Bit);
+}
+
+#[test]
 fn dot_is_char() {
     assert_eq!(infer(b".", 0, 0).unwrap().name, SQLTypeName::Char);
 }
@@ -18,6 +23,11 @@ fn dot_is_char() {
 #[test]
 fn leading_zero_is_char() {
     assert_eq!(infer(b"0123", 0, 0).unwrap().name, SQLTypeName::Char);
+}
+
+#[test]
+fn zero_dot_zero_is_numeric() {
+    assert_eq!(infer(b"0.00", 0, 0).unwrap().name, SQLTypeName::Numeric);
 }
 
 #[test]
@@ -64,6 +74,17 @@ fn datetime_if_no_tz() {
     assert_eq!(
         infer(b"2004-05-07T09:38:01", 0, 0).unwrap().name,
         SQLTypeName::Datetime2
+    );
+}
+
+#[test]
+fn zero_is_int_after_merge() {
+    let mut num = infer(b"123456789", 0, 0).unwrap();
+    let zero = infer(b"0", 0, 0).unwrap();
+    num.merge(&zero);
+    assert_eq!(
+        num.name,
+        SQLTypeName::Int
     );
 }
 
