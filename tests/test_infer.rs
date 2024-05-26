@@ -31,6 +31,11 @@ fn zero_dot_zero_is_numeric() {
 }
 
 #[test]
+fn zero_dot_number_is_numeric() {
+    assert_eq!(infer(b"0.24", 0, 0).unwrap().name, SQLTypeName::Numeric);
+}
+
+#[test]
 fn padded_zero_dot_zeros_are_numeric() {
     assert_eq!(infer(b" 0.0000 ", 0, 0).unwrap().name, SQLTypeName::Numeric);
 }

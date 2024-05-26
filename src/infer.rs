@@ -166,7 +166,7 @@ pub fn infer(value: &[u8], mut index: usize, subindex: usize) -> Option<SQLType>
 }
 
 fn zero_padded(value: &[u8]) -> bool {
-    value.len() > 0 && value[0] == b'0' && value.iter().any(|&x| x != b'0' && x != b'.')
+    value.len() > 0 && value[0] == b'0' && value[1] != b'.' && value.iter().any(|&x| x != b'0' && x != b'.')
 }
 
 fn check_bit(value: ByteText, _subindex: usize) -> Option<SQLType> {
